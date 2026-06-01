@@ -1,0 +1,185 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper
+PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+"http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.ruoyi.system.mapper.NewsArticleMapper">
+
+    <resultMap type="NewsArticle" id="NewsArticleResult">
+        <result property="id"           column="id"            />
+        <result property="sourceId"     column="source_id"     />
+        <result property="sourceName"   column="source_name"   />
+        <result property="title"        column="title"         />
+        <result property="summary"      column="summary"       />
+        <result property="content"      column="content"       />
+        <result property="originalUrl"  column="original_url"  />
+        <result property="language"     column="language"      />
+        <result property="tags"         column="tags"          />
+        <result property="sentiment"    column="sentiment"     />
+        <result property="keywords"     column="keywords"      />
+        <result property="publishTime"  column="publish_time"  />
+        <result property="fetchTime"    column="fetch_time"    />
+        <result property="isPushed"     column="is_pushed"     />
+        <result property="pushTime"     column="push_time"     />
+        <result property="readCount"    column="read_count"    />
+        <result property="status"       column="status"        />
+        <result property="createBy"     column="create_by"     />
+        <result property="createTime"   column="create_time"   />
+        <result property="updateBy"     column="update_by"     />
+        <result property="updateTime"   column="update_time"   />
+        <result property="remark"       column="remark"        />
+    </resultMap>
+
+    <sql id="selectNewsArticleVo">
+        select a.id, a.source_id, s.name as source_name, a.title, a.summary, a.content,
+               a.original_url, a.language, a.tags, a.sentiment, a.keywords,
+               a.publish_time, a.fetch_time, a.is_pushed, a.push_time, a.read_count,
+               a.status, a.create_by, a.create_time, a.update_by, a.update_time, a.remark
+        from wendao_news.news_article a
+        left join wendao_news.news_source s on a.source_id = s.id
+    </sql>
+
+    <select id="selectArticleById" parameterType="Long" resultMap="NewsArticleResult">
+        <include refid="selectNewsArticleVo"/>
+        where a.id = #{id}
+    </select>
+
+    <select id="selectArticleList" parameterType="NewsArticle" resultMap="NewsArticleResult">
+        <include refid="selectNewsArticleVo"/>
+        <where>
+            <if test="title != null and title != ''">
+                AND a.title like concat('%', #{title}, '%')
+            </if>
+            <if test="sourceId != null">
+                AND a.source_id = #{sourceId}
+            </if>
+            <if test="language != null and language != ''">
+                AND a.language = #{language}
+            </if>
+            <if test="sentiment != null and sentiment != ''">
+                AND a.sentiment = #{sentiment}
+            </if>
+            <if test="isPushed != null and isPushed != ''">
+                AND a.is_pushed = #{isPushed}
+            </if>
+            <if test="status != null and status != ''">
+                AND a.status = #{status}
+            </if>
+            <if test="params.beginTime != null and params.beginTime != ''">
+                AND a.publish_time &gt;= #{params.beginTime}
+            </if>
+            <if test="params.endTime != null and params.endTime != ''">
+                AND a.publish_time &lt;= #{params.endTime}
+            </if>
+        </where>
+        order by a.publish_time desc
+    </select>
+
+    <select id="selectArticleByUrl" parameterType="String" resultMap="NewsArticleResult">
+        <include refid="selectNewsArticleVo"/>
+        where a.original_url = #{originalUrl}
+    </select>
+
+    <select id="selectUnpushedArticles" resultMap="NewsArticleResult">
+        <include refid="selectNewsArticleVo"/>
+        where a.is_pushed = '0' and a.status = '0'
+        order by a.fetch_time asc
+    </select>
+
+    <select id="selectDashboardStats" resultType="java.util.HashMap">
+        select
+            (select count(*) from wendao_news.news_article where status = '0') as totalArticles,
+            (select count(*) from wendao_news.news_article where status = '0' and date(fetch_time) = curdate()) as todayArticles
+    </select>
+
+    <select id="select24HourTimeline" resultType="java.util.HashMap">
+        select date_format(fetch_time, '%Y-%m-%d %H:00') as hour, count(*) as count
+        from wendao_news.news_article
+        where status = '0' and fetch_time >= date_sub(now(), interval 24 hour)
+        group by date_format(fetch_time, '%Y-%m-%d %H:00')
+        order by hour asc
+    </select>
+
+    <select id="selectSourceDistribution" resultType="java.util.HashMap">
+        select s.name, count(*) as value
+        from wendao_news.news_article a
+        left join wendao_news.news_source s on a.source_id = s.id
+        where a.status = '0'
+        group by a.source_id, s.name
+        order by value desc
+    </select>
+
+    <select id="selectSentimentDistribution" resultType="java.util.HashMap">
+        select sentiment as name, count(*) as value
+        from wendao_news.news_article
+        where status = '0' and sentiment is not null
+        group by sentiment
+    </select>
+
+    <insert id="insertArticle" parameterType="NewsArticle">
+        insert into wendao_news.news_article (
+            <if test="sourceId != null">source_id, </if>
+            <if test="sourceName != null">source_name, </if>
+            <if test="title != null and title != ''">title, </if>
+            <if test="summary != null">summary, </if>
+            <if test="content != null">content, </if>
+            <if test="originalUrl != null">original_url, </if>
+            <if test="language != null">language, </if>
+            <if test="tags != null">tags, </if>
+            <if test="sentiment != null">sentiment, </if>
+            <if test="keywords != null">keywords, </if>
+            <if test="publishTime != null">publish_time, </if>
+            <if test="isPushed != null">is_pushed, </if>
+            <if test="status != null">status, </if>
+            <if test="createBy != null">create_by,</if>
+            create_time
+        )values(
+            <if test="sourceId != null">#{sourceId}, </if>
+            <if test="sourceName != null">#{sourceName}, </if>
+            <if test="title != null and title != ''">#{title}, </if>
+            <if test="summary != null">#{summary}, </if>
+            <if test="content != null">#{content}, </if>
+            <if test="originalUrl != null">#{originalUrl}, </if>
+            <if test="language != null">#{language}, </if>
+            <if test="tags != null">#{tags}, </if>
+            <if test="sentiment != null">#{sentiment}, </if>
+            <if test="keywords != null">#{keywords}, </if>
+            <if test="publishTime != null">#{publishTime}, </if>
+            <if test="isPushed != null">#{isPushed}, </if>
+            <if test="status != null">#{status}, </if>
+            <if test="createBy != null">#{createBy},</if>
+            sysdate()
+        )
+    </insert>
+
+    <update id="updateArticle" parameterType="NewsArticle">
+        update wendao_news.news_article
+        <set>
+            <if test="title != null and title != ''">title = #{title}, </if>
+            <if test="summary != null">summary = #{summary}, </if>
+            <if test="content != null">content = #{content}, </if>
+            <if test="tags != null">tags = #{tags}, </if>
+            <if test="sentiment != null">sentiment = #{sentiment}, </if>
+            <if test="keywords != null">keywords = #{keywords}, </if>
+            <if test="status != null">status = #{status}, </if>
+            <if test="updateBy != null">update_by = #{updateBy},</if>
+            update_time = sysdate()
+        </set>
+        where id = #{id}
+    </update>
+
+    <update id="markAsPushed" parameterType="Long">
+        update wendao_news.news_article set is_pushed = '1', push_time = sysdate() where id = #{id}
+    </update>
+
+    <delete id="deleteArticleById" parameterType="Long">
+        delete from wendao_news.news_article where id = #{id}
+    </delete>
+
+    <delete id="deleteArticleByIds" parameterType="Long">
+        delete from wendao_news.news_article where id in
+        <foreach item="id" collection="array" open="(" separator="," close=")">
+            #{id}
+        </foreach>
+    </delete>
+
+</mapper>

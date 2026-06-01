@@ -1,0 +1,110 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper
+PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+"http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.ruoyi.system.mapper.NewsSourceMapper">
+
+    <resultMap type="NewsSource" id="NewsSourceResult">
+        <result property="id"            column="id"             />
+        <result property="name"          column="name"           />
+        <result property="type"          column="type"           />
+        <result property="url"           column="url"            />
+        <result property="fetchType"     column="fetch_type"     />
+        <result property="fetchInterval" column="fetch_interval" />
+        <result property="fetchConfig"   column="fetch_config"   />
+        <result property="status"        column="status"         />
+        <result property="createBy"      column="create_by"      />
+        <result property="createTime"    column="create_time"    />
+        <result property="updateBy"      column="update_by"      />
+        <result property="updateTime"    column="update_time"    />
+        <result property="remark"        column="remark"         />
+    </resultMap>
+
+    <sql id="selectNewsSourceVo">
+        select id, name, type, url, fetch_type, fetch_interval, fetch_config, status,
+               create_by, create_time, update_by, update_time, remark
+        from wendao_news.news_source
+    </sql>
+
+    <select id="selectSourceById" parameterType="Long" resultMap="NewsSourceResult">
+        <include refid="selectNewsSourceVo"/>
+        where id = #{id}
+    </select>
+
+    <select id="selectSourceList" parameterType="NewsSource" resultMap="NewsSourceResult">
+        <include refid="selectNewsSourceVo"/>
+        <where>
+            <if test="name != null and name != ''">
+                AND name like concat('%', #{name}, '%')
+            </if>
+            <if test="type != null and type != ''">
+                AND type = #{type}
+            </if>
+            <if test="status != null and status != ''">
+                AND status = #{status}
+            </if>
+        </where>
+        order by id asc
+    </select>
+
+    <select id="selectEnabledSources" resultMap="NewsSourceResult">
+        <include refid="selectNewsSourceVo"/>
+        where status = '0'
+        order by id asc
+    </select>
+
+    <insert id="insertSource" parameterType="NewsSource">
+        insert into wendao_news.news_source (
+            <if test="name != null and name != ''">name, </if>
+            <if test="type != null and type != ''">type, </if>
+            <if test="url != null and url != ''">url, </if>
+            <if test="fetchType != null and fetchType != ''">fetch_type, </if>
+            <if test="fetchInterval != null">fetch_interval, </if>
+            <if test="fetchConfig != null">fetch_config, </if>
+            <if test="status != null and status != ''">status, </if>
+            <if test="remark != null and remark != ''">remark,</if>
+            <if test="createBy != null and createBy != ''">create_by,</if>
+            create_time
+        )values(
+            <if test="name != null and name != ''">#{name}, </if>
+            <if test="type != null and type != ''">#{type}, </if>
+            <if test="url != null and url != ''">#{url}, </if>
+            <if test="fetchType != null and fetchType != ''">#{fetchType}, </if>
+            <if test="fetchInterval != null">#{fetchInterval}, </if>
+            <if test="fetchConfig != null">#{fetchConfig}, </if>
+            <if test="status != null and status != ''">#{status}, </if>
+            <if test="remark != null and remark != ''">#{remark},</if>
+            <if test="createBy != null and createBy != ''">#{createBy},</if>
+            sysdate()
+        )
+    </insert>
+
+    <update id="updateSource" parameterType="NewsSource">
+        update wendao_news.news_source
+        <set>
+            <if test="name != null and name != ''">name = #{name}, </if>
+            <if test="type != null and type != ''">type = #{type}, </if>
+            <if test="url != null and url != ''">url = #{url}, </if>
+            <if test="fetchType != null and fetchType != ''">fetch_type = #{fetchType}, </if>
+            <if test="fetchInterval != null">fetch_interval = #{fetchInterval}, </if>
+            <if test="fetchConfig != null">fetch_config = #{fetchConfig}, </if>
+            <if test="status != null and status != ''">status = #{status}, </if>
+            <if test="remark != null">remark = #{remark},</if>
+            <if test="updateBy != null and updateBy != ''">update_by = #{updateBy},</if>
+            update_time = sysdate()
+        </set>
+        where id = #{id}
+    </update>
+
+    <delete id="deleteSourceById" parameterType="Long">
+        delete from wendao_news.news_source where id = #{id}
+    </delete>
+
+    <delete id="deleteSourceByIds" parameterType="Long">
+        delete from wendao_news.news_source where id in
+        <foreach item="id" collection="array" open="(" separator="," close=")">
+            #{id}
+        </foreach>
+    </delete>
+
+</mapper>
