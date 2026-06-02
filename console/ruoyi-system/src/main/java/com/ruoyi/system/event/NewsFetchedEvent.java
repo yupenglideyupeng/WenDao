@@ -1,4 +1,4 @@
-package com.ruoyi.common.event;
+package com.ruoyi.system.event;
 
 import java.util.List;
 import org.springframework.context.ApplicationEvent;

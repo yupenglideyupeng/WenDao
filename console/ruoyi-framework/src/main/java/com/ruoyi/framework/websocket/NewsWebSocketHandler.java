@@ -14,7 +14,7 @@ import org.springframework.web.socket.handler.TextWebSocketHandler;
 import org.springframework.context.event.EventListener;
 import com.alibaba.fastjson2.JSON;
 import com.ruoyi.common.core.domain.model.LoginUser;
-import com.ruoyi.common.event.NewsFetchedEvent;
+import com.ruoyi.system.event.NewsFetchedEvent;
 import com.ruoyi.system.domain.NewsArticle;
 
 /**

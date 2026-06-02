@@ -27,7 +27,7 @@ import org.springframework.context.ApplicationEventPublisher;
 import com.alibaba.fastjson2.JSON;
 import com.alibaba.fastjson2.JSONArray;
 import com.alibaba.fastjson2.JSONObject;
-import com.ruoyi.common.event.NewsFetchedEvent;
+import com.ruoyi.system.event.NewsFetchedEvent;
 import com.ruoyi.common.utils.StringUtils;
 import com.ruoyi.system.domain.NewsArticle;
 import com.ruoyi.system.domain.NewsPushLog;
