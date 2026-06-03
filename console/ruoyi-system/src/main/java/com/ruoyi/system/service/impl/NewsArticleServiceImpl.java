@@ -42,7 +42,7 @@ public class NewsArticleServiceImpl implements INewsArticleService
     public Map<String, Object> getDashboardStats()
     {
         Map<String, Object> stats = new HashMap<>();
-        // 基础统计
+        // 基础统计（含国内/国外计数）
         Map<String, Object> baseStats = articleMapper.selectDashboardStats();
         if (baseStats != null)
         {
@@ -57,6 +57,9 @@ public class NewsArticleServiceImpl implements INewsArticleService
         // 24小时趋势
         List<Map<String, Object>> timeline = articleMapper.select24HourTimeline();
         stats.put("timelineData", timeline);
+        // 热门标签
+        List<Map<String, Object>> hotTags = articleMapper.selectHotTags();
+        stats.put("hotTags", hotTags);
         return stats;
     }
 

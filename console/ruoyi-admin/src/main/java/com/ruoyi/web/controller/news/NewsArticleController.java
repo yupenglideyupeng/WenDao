@@ -16,6 +16,7 @@ import com.ruoyi.common.core.controller.BaseController;
 import com.ruoyi.common.core.domain.AjaxResult;
 import com.ruoyi.common.core.page.TableDataInfo;
 import com.ruoyi.common.enums.BusinessType;
+import com.ruoyi.framework.websocket.NewsWebSocketHandler;
 import com.ruoyi.system.domain.NewsArticle;
 import com.ruoyi.system.service.INewsArticleService;
 
@@ -30,6 +31,9 @@ public class NewsArticleController extends BaseController
 {
     @Autowired
     private INewsArticleService newsArticleService;
+
+    @Autowired
+    private NewsWebSocketHandler webSocketHandler;
 
     /**
      * 获取新闻文章列表
@@ -89,9 +93,10 @@ public class NewsArticleController extends BaseController
         {
             return error("文章不存在");
         }
-        // 推送通过事件机制处理，这里标记为待推送
-        article.setIsPushed("0");
-        newsArticleService.updateArticle(article);
+        // 标记为已推送
+        newsArticleService.markAsPushed(id);
+        // 通过WebSocket广播推送
+        webSocketHandler.broadcastArticle(article);
         return success();
     }
 }

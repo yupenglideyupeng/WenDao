@@ -147,6 +147,15 @@ xss:
 news:
   # 抓取间隔(毫秒)，默认5分钟
   fetch-interval: 300000
-  # AI API配置(后续对接)
-  ai-api-url:
-  ai-api-key:
+  # AI分析配置
+  ai:
+    # 是否启用AI分析
+    enabled: true
+    # AI API地址（默认DeepSeek，国内直连）
+    api-url: https://api.deepseek.com/v1/chat/completions
+    # AI API密钥（在 platform.deepseek.com 获取）
+    api-key: sk-cbff04c89e494c498db11ab01ad95093
+    # 模型名称
+    model: deepseek-chat
+    # 超时时间(毫秒)
+    timeout: 30000

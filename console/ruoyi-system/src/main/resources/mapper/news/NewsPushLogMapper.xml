@@ -16,7 +16,7 @@ PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
 
     <sql id="selectNewsPushLogVo">
         select id, article_id, push_time, push_status, push_type, error_msg, create_time
-        from wendao_news.news_push_log
+        from news_push_log
     </sql>
 
     <select id="selectPushLogById" parameterType="Long" resultMap="NewsPushLogResult">
@@ -38,7 +38,7 @@ PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
     </select>
 
     <insert id="insertPushLog" parameterType="NewsPushLog">
-        insert into wendao_news.news_push_log (
+        insert into news_push_log (
             <if test="articleId != null">article_id, </if>
             <if test="pushStatus != null and pushStatus != ''">push_status, </if>
             <if test="pushType != null and pushType != ''">push_type, </if>
@@ -54,7 +54,7 @@ PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
     </insert>
 
     <delete id="deletePushLogByIds" parameterType="Long">
-        delete from wendao_news.news_push_log where id in
+        delete from news_push_log where id in
         <foreach item="id" collection="array" open="(" separator="," close=")">
             #{id}
         </foreach>

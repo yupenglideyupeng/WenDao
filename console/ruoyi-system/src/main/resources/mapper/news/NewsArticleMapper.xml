@@ -34,8 +34,8 @@ PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
                a.original_url, a.language, a.tags, a.sentiment, a.keywords,
                a.publish_time, a.fetch_time, a.is_pushed, a.push_time, a.read_count,
                a.status, a.create_by, a.create_time, a.update_by, a.update_time, a.remark
-        from wendao_news.news_article a
-        left join wendao_news.news_source s on a.source_id = s.id
+        from news_article a
+        left join news_source s on a.source_id = s.id
     </sql>
 
     <select id="selectArticleById" parameterType="Long" resultMap="NewsArticleResult">
@@ -87,13 +87,15 @@ PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
 
     <select id="selectDashboardStats" resultType="java.util.HashMap">
         select
-            (select count(*) from wendao_news.news_article where status = '0') as totalArticles,
-            (select count(*) from wendao_news.news_article where status = '0' and date(fetch_time) = curdate()) as todayArticles
+            (select count(*) from news_article where status = '0') as totalArticles,
+            (select count(*) from news_article where status = '0' and date(fetch_time) = curdate()) as todayArticles,
+            (select count(*) from news_article a left join news_source s on a.source_id = s.id where a.status = '0' and s.type = '0') as domesticCount,
+            (select count(*) from news_article a left join news_source s on a.source_id = s.id where a.status = '0' and s.type = '1') as foreignCount
     </select>
 
     <select id="select24HourTimeline" resultType="java.util.HashMap">
         select date_format(fetch_time, '%Y-%m-%d %H:00') as hour, count(*) as count
-        from wendao_news.news_article
+        from news_article
         where status = '0' and fetch_time >= date_sub(now(), interval 24 hour)
         group by date_format(fetch_time, '%Y-%m-%d %H:00')
         order by hour asc
@@ -101,8 +103,8 @@ PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
 
     <select id="selectSourceDistribution" resultType="java.util.HashMap">
         select s.name, count(*) as value
-        from wendao_news.news_article a
-        left join wendao_news.news_source s on a.source_id = s.id
+        from news_article a
+        left join news_source s on a.source_id = s.id
         where a.status = '0'
         group by a.source_id, s.name
         order by value desc
@@ -110,13 +112,23 @@ PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
 
     <select id="selectSentimentDistribution" resultType="java.util.HashMap">
         select sentiment as name, count(*) as value
-        from wendao_news.news_article
+        from news_article
         where status = '0' and sentiment is not null
         group by sentiment
     </select>
 
-    <insert id="insertArticle" parameterType="NewsArticle">
-        insert into wendao_news.news_article (
+    <select id="selectHotTags" resultType="java.util.HashMap">
+        select jt.tag_name as name, count(*) as value
+        from news_article,
+        json_table(tags, '$[*]' columns (tag_name varchar(100) path '$')) as jt
+        where status = '0' and tags is not null
+        group by jt.tag_name
+        order by value desc
+        limit 15
+    </select>
+
+    <insert id="insertArticle" parameterType="NewsArticle" useGeneratedKeys="true" keyProperty="id" keyColumn="id">
+        insert into news_article (
             <if test="sourceId != null">source_id, </if>
             <if test="sourceName != null">source_name, </if>
             <if test="title != null and title != ''">title, </if>
@@ -152,7 +164,7 @@ PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
     </insert>
 
     <update id="updateArticle" parameterType="NewsArticle">
-        update wendao_news.news_article
+        update news_article
         <set>
             <if test="title != null and title != ''">title = #{title}, </if>
             <if test="summary != null">summary = #{summary}, </if>
@@ -168,15 +180,15 @@ PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
     </update>
 
     <update id="markAsPushed" parameterType="Long">
-        update wendao_news.news_article set is_pushed = '1', push_time = sysdate() where id = #{id}
+        update news_article set is_pushed = '1', push_time = sysdate() where id = #{id}
     </update>
 
     <delete id="deleteArticleById" parameterType="Long">
-        delete from wendao_news.news_article where id = #{id}
+        delete from news_article where id = #{id}
     </delete>
 
     <delete id="deleteArticleByIds" parameterType="Long">
-        delete from wendao_news.news_article where id in
+        delete from news_article where id in
         <foreach item="id" collection="array" open="(" separator="," close=")">
             #{id}
         </foreach>

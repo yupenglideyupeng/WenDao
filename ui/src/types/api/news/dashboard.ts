@@ -2,9 +2,12 @@
 export interface DashboardStats {
   totalArticles?: number
   todayArticles?: number
+  domesticCount?: number
+  foreignCount?: number
   sourceDistribution?: { name: string; value: number }[]
   sentimentDistribution?: { name: string; value: number }[]
   timelineData?: { hour: string; count: number }[]
+  hotTags?: { name: string; value: number }[]
 }
 
 /** WebSocket消息 */

@@ -23,7 +23,7 @@ PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
     <sql id="selectNewsSourceVo">
         select id, name, type, url, fetch_type, fetch_interval, fetch_config, status,
                create_by, create_time, update_by, update_time, remark
-        from wendao_news.news_source
+        from news_source
     </sql>
 
     <select id="selectSourceById" parameterType="Long" resultMap="NewsSourceResult">
@@ -54,7 +54,7 @@ PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
     </select>
 
     <insert id="insertSource" parameterType="NewsSource">
-        insert into wendao_news.news_source (
+        insert into news_source (
             <if test="name != null and name != ''">name, </if>
             <if test="type != null and type != ''">type, </if>
             <if test="url != null and url != ''">url, </if>
@@ -80,7 +80,7 @@ PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
     </insert>
 
     <update id="updateSource" parameterType="NewsSource">
-        update wendao_news.news_source
+        update news_source
         <set>
             <if test="name != null and name != ''">name = #{name}, </if>
             <if test="type != null and type != ''">type = #{type}, </if>
@@ -97,11 +97,11 @@ PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
     </update>
 
     <delete id="deleteSourceById" parameterType="Long">
-        delete from wendao_news.news_source where id = #{id}
+        delete from news_source where id = #{id}
     </delete>
 
     <delete id="deleteSourceByIds" parameterType="Long">
-        delete from wendao_news.news_source where id in
+        delete from news_source where id in
         <foreach item="id" collection="array" open="(" separator="," close=")">
             #{id}
         </foreach>

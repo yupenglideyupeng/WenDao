@@ -52,6 +52,11 @@ public interface NewsArticleMapper
     public List<Map<String, Object>> selectSentimentDistribution();
 
     /**
+     * 查询热门标签
+     */
+    public List<Map<String, Object>> selectHotTags();
+
+    /**
      * 新增文章
      */
     public int insertArticle(NewsArticle article);

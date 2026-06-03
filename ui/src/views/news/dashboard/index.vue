@@ -111,8 +111,9 @@
 import { ref, reactive, onMounted, onUnmounted, nextTick, computed } from 'vue'
 import * as echarts from 'echarts'
 import { getToken } from '@/utils/auth'
-import { getDashboardStats, getLatestArticles } from '@/api/news/dashboard'
-import type { NewsArticle, DashboardStats } from '@/types/api/news/dashboard'
+import { getDashboardStats, getLatestArticles, getOnlineCount } from '@/api/news/dashboard'
+import type { DashboardStats } from '@/types/api/news/dashboard'
+import type { NewsArticle } from '@/types/api/news/article'
 
 const currentTime = ref('')
 let timeTimer: number
@@ -191,10 +192,24 @@ async function loadStats() {
     const res = await getDashboardStats()
     if (res.data) {
       stats.value = res.data
+      domesticCount.value = res.data.domesticCount || 0
+      foreignCount.value = res.data.foreignCount || 0
+      hotTags.value = (res.data.hotTags || []).map((t: any) => t.name)
       renderCharts()
     }
   } catch (e) {
     console.error('Load stats error:', e)
+  }
+}
+
+async function loadOnlineCount() {
+  try {
+    const res = await getOnlineCount()
+    if (res.data) {
+      onlineCount.value = res.data.onlineCount
+    }
+  } catch (e) {
+    console.error('Load online count error:', e)
   }
 }
 
@@ -281,6 +296,7 @@ function truncateText(text: string, maxLen: number) {
 onMounted(async () => {
   await loadStats()
   await loadLatest()
+  await loadOnlineCount()
   await nextTick()
   renderCharts()
   connectWebSocket()

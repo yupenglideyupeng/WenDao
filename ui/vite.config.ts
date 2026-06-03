@@ -56,6 +56,12 @@ export default defineConfig(({ mode, command }) => {
          '^/v3/api-docs/(.*)': {
           target: baseUrl,
           changeOrigin: true,
+        },
+         // WebSocket 代理
+         '/ws': {
+          target: baseUrl,
+          ws: true,
+          changeOrigin: true,
         }
       }
     },

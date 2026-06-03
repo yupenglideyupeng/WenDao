@@ -9,6 +9,7 @@ import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 import com.ruoyi.common.core.controller.BaseController;
 import com.ruoyi.common.core.domain.AjaxResult;
+import com.ruoyi.framework.websocket.NewsWebSocketHandler;
 import com.ruoyi.system.domain.NewsArticle;
 import com.ruoyi.system.service.INewsArticleService;
 
@@ -23,6 +24,9 @@ public class NewsDashboardController extends BaseController
 {
     @Autowired
     private INewsArticleService newsArticleService;
+
+    @Autowired
+    private NewsWebSocketHandler webSocketHandler;
 
     /**
      * 获取大屏统计数据
@@ -47,5 +51,15 @@ public class NewsDashboardController extends BaseController
         startPage();
         List<NewsArticle> list = newsArticleService.selectArticleList(query);
         return success(list);
+    }
+
+    /**
+     * 获取在线客户端数量
+     */
+    @GetMapping("/onlineCount")
+    public AjaxResult getOnlineCount()
+    {
+        int count = webSocketHandler.getOnlineCount();
+        return success(Map.of("onlineCount", count));
     }
 }

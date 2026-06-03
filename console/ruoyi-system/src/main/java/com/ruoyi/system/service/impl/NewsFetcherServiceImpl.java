@@ -33,6 +33,7 @@ import com.ruoyi.system.domain.NewsArticle;
 import com.ruoyi.system.domain.NewsPushLog;
 import com.ruoyi.system.domain.NewsSource;
 import com.ruoyi.system.mapper.NewsArticleMapper;
+import com.ruoyi.system.service.INewsAiAnalysisService;
 import com.ruoyi.system.service.INewsArticleService;
 import com.ruoyi.system.service.INewsFetcherService;
 import com.ruoyi.system.service.INewsPushLogService;
@@ -62,6 +63,9 @@ public class NewsFetcherServiceImpl implements INewsFetcherService
 
     @Autowired
     private ApplicationEventPublisher eventPublisher;
+
+    @Autowired
+    private INewsAiAnalysisService aiAnalysisService;
 
     private final RestTemplate restTemplate = new RestTemplate();
 
@@ -149,6 +153,8 @@ public class NewsFetcherServiceImpl implements INewsFetcherService
                     article.setLanguage("1".equals(source.getType()) ? "en" : "zh");
                 }
                 newsArticleService.insertArticle(article);
+                // AI分析（异步，不阻塞抓取流程）
+                aiAnalysisService.analyzeAsync(article);
                 count++;
             }
             catch (Exception e)
