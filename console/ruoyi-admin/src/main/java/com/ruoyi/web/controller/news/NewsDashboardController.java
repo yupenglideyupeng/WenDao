@@ -7,8 +7,10 @@ import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
+import com.ruoyi.common.annotation.Log;
 import com.ruoyi.common.core.controller.BaseController;
 import com.ruoyi.common.core.domain.AjaxResult;
+import com.ruoyi.common.enums.BusinessType;
 import com.ruoyi.framework.websocket.NewsWebSocketHandler;
 import com.ruoyi.system.domain.NewsArticle;
 import com.ruoyi.system.service.INewsArticleService;
@@ -31,6 +33,7 @@ public class NewsDashboardController extends BaseController
     /**
      * 获取大屏统计数据
      */
+    @Log(title = "新闻大屏", businessType = BusinessType.OTHER, isSaveResponseData = false)
     @GetMapping("/stats")
     public AjaxResult getStats()
     {
@@ -41,6 +44,7 @@ public class NewsDashboardController extends BaseController
     /**
      * 获取最新文章列表
      */
+    @Log(title = "新闻大屏", businessType = BusinessType.OTHER, isSaveResponseData = false)
     @GetMapping("/latest")
     public AjaxResult getLatestArticles(@RequestParam(defaultValue = "20") int limit)
     {
@@ -56,6 +60,7 @@ public class NewsDashboardController extends BaseController
     /**
      * 获取在线客户端数量
      */
+    @Log(title = "新闻大屏", businessType = BusinessType.OTHER, isSaveResponseData = false)
     @GetMapping("/onlineCount")
     public AjaxResult getOnlineCount()
     {

@@ -36,6 +36,7 @@ public class NewsSourceController extends BaseController
      * 获取新闻来源列表
      */
     @PreAuthorize("@ss.hasPermi('news:source:list')")
+    @Log(title = "新闻来源", businessType = BusinessType.OTHER, isSaveResponseData = false)
     @GetMapping("/list")
     public TableDataInfo list(NewsSource source)
     {
@@ -48,6 +49,7 @@ public class NewsSourceController extends BaseController
      * 根据编号获取详细信息
      */
     @PreAuthorize("@ss.hasPermi('news:source:query')")
+    @Log(title = "新闻来源", businessType = BusinessType.OTHER, isSaveResponseData = false)
     @GetMapping(value = "/{id}")
     public AjaxResult getInfo(@PathVariable Long id)
     {

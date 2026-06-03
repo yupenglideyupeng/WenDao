@@ -39,6 +39,7 @@ public class NewsArticleController extends BaseController
      * 获取新闻文章列表
      */
     @PreAuthorize("@ss.hasPermi('news:article:list')")
+    @Log(title = "新闻文章", businessType = BusinessType.OTHER, isSaveResponseData = false)
     @GetMapping("/list")
     public TableDataInfo list(NewsArticle article)
     {
@@ -51,6 +52,7 @@ public class NewsArticleController extends BaseController
      * 根据编号获取详细信息
      */
     @PreAuthorize("@ss.hasPermi('news:article:query')")
+    @Log(title = "新闻文章", businessType = BusinessType.OTHER, isSaveResponseData = false)
     @GetMapping(value = "/{id}")
     public AjaxResult getInfo(@PathVariable Long id)
     {
