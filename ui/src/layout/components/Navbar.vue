@@ -13,11 +13,11 @@
         <header-search id="header-search" class="right-menu-item" />
 
         <el-tooltip content="源码地址" effect="dark" placement="bottom">
-          <ruo-yi-git id="ruoyi-git" class="right-menu-item hover-effect" />
+          <wen-dao-git id="wendao-git" class="right-menu-item hover-effect" />
         </el-tooltip>
 
         <el-tooltip content="文档地址" effect="dark" placement="bottom">
-          <ruo-yi-doc id="ruoyi-doc" class="right-menu-item hover-effect" />
+          <wen-dao-doc id="wendao-doc" class="right-menu-item hover-effect" />
         </el-tooltip>
 
         <screenfull id="screenfull" class="right-menu-item hover-effect" />
@@ -74,8 +74,8 @@ import Hamburger from '@/components/Hamburger/index.vue'
 import Screenfull from '@/components/Screenfull/index.vue'
 import SizeSelect from '@/components/SizeSelect/index.vue'
 import HeaderSearch from '@/components/HeaderSearch/index.vue'
-import RuoYiGit from '@/components/RuoYi/Git/index.vue'
-import RuoYiDoc from '@/components/RuoYi/Doc/index.vue'
+import WenDaoGit from '@/components/WenDao/Git/index.vue'
+import WenDaoDoc from '@/components/WenDao/Doc/index.vue'
 import useAppStore from '@/store/modules/app'
 import useUserStore from '@/store/modules/user'
 import useLockStore from '@/store/modules/lock'

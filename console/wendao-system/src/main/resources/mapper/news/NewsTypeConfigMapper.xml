@@ -1,0 +1,66 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.wendao.system.mapper.NewsTypeConfigMapper">
+
+    <resultMap type="NewsTypeConfig" id="Result">
+        <result property="id"          column="id"/>
+        <result property="typeName"    column="type_name"/>
+        <result property="typeCode"    column="type_code"/>
+        <result property="description" column="description"/>
+        <result property="sortOrder"   column="sort_order"/>
+        <result property="isActive"    column="is_active"/>
+        <result property="createBy"    column="create_by"/>
+        <result property="createTime"  column="create_time"/>
+        <result property="updateBy"    column="update_by"/>
+        <result property="updateTime"  column="update_time"/>
+        <result property="remark"      column="remark"/>
+    </resultMap>
+
+    <sql id="vo">select id, type_name, type_code, description, sort_order, is_active, create_by, create_time, update_by, update_time, remark from news_type_config</sql>
+
+    <select id="selectById" parameterType="Long" resultMap="Result"><include refid="vo"/> where id=#{id}</select>
+    <select id="selectByCode" parameterType="String" resultMap="Result"><include refid="vo"/> where type_code=#{typeCode}</select>
+
+    <select id="selectList" parameterType="NewsTypeConfig" resultMap="Result">
+        <include refid="vo"/>
+        <where>
+            <if test="typeName != null and typeName != ''">AND type_name like concat('%',#{typeName},'%')</if>
+            <if test="typeCode != null and typeCode != ''">AND type_code=#{typeCode}</if>
+            <if test="isActive != null">AND is_active=#{isActive}</if>
+        </where>
+        order by sort_order asc, id asc
+    </select>
+
+    <select id="selectActive" resultMap="Result"><include refid="vo"/> where is_active=1 order by sort_order asc</select>
+
+    <insert id="insert" parameterType="NewsTypeConfig">
+        insert into news_type_config (<include refid="insCols"/>) values (<include refid="insVals"/>)
+    </insert>
+    <sql id="insCols">
+        <if test="typeName != null">type_name,</if><if test="typeCode != null">type_code,</if>
+        <if test="description != null">description,</if><if test="sortOrder != null">sort_order,</if>
+        <if test="isActive != null">is_active,</if><if test="remark != null">remark,</if>
+        <if test="createBy != null">create_by,</if>create_time
+    </sql>
+    <sql id="insVals">
+        <if test="typeName != null">#{typeName},</if><if test="typeCode != null">#{typeCode},</if>
+        <if test="description != null">#{description},</if><if test="sortOrder != null">#{sortOrder},</if>
+        <if test="isActive != null">#{isActive},</if><if test="remark != null">#{remark},</if>
+        <if test="createBy != null">#{createBy},</if>sysdate()
+    </sql>
+
+    <update id="update" parameterType="NewsTypeConfig">
+        update news_type_config <set>
+            <if test="typeName != null">type_name=#{typeName},</if>
+            <if test="typeCode != null">type_code=#{typeCode},</if>
+            <if test="description != null">description=#{description},</if>
+            <if test="sortOrder != null">sort_order=#{sortOrder},</if>
+            <if test="isActive != null">is_active=#{isActive},</if>
+            <if test="remark != null">remark=#{remark},</if>
+            <if test="updateBy != null">update_by=#{updateBy},</if>update_time=sysdate()
+        </set> where id=#{id}
+    </update>
+
+    <delete id="deleteById" parameterType="Long">delete from news_type_config where id=#{id}</delete>
+    <delete id="deleteByIds" parameterType="Long">delete from news_type_config where id in <foreach item="id" collection="array" open="(" separator="," close=")">#{id}</foreach></delete>
+</mapper>

@@ -1,0 +1,62 @@
+package com.wendao.system.service.impl;
+
+import java.util.List;
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.stereotype.Service;
+import com.wendao.system.domain.NewsSource;
+import com.wendao.system.mapper.NewsSourceMapper;
+import com.wendao.system.service.INewsSourceService;
+
+/**
+ * 新闻来源 服务层实现
+ *
+ * @author wendao
+ */
+@Service
+public class NewsSourceServiceImpl implements INewsSourceService
+{
+    @Autowired
+    private NewsSourceMapper sourceMapper;
+
+    @Override
+    public NewsSource selectSourceById(Long id)
+    {
+        return sourceMapper.selectSourceById(id);
+    }
+
+    @Override
+    public List<NewsSource> selectSourceList(NewsSource source)
+    {
+        return sourceMapper.selectSourceList(source);
+    }
+
+    @Override
+    public List<NewsSource> selectEnabledSources()
+    {
+        return sourceMapper.selectEnabledSources();
+    }
+
+    @Override
+    public int insertSource(NewsSource source)
+    {
+        return sourceMapper.insertSource(source);
+    }
+
+    @Override
+    public int updateSource(NewsSource source)
+    {
+        return sourceMapper.updateSource(source);
+    }
+
+    @Override
+    public int deleteSourceById(Long id)
+    {
+        return sourceMapper.deleteSourceById(id);
+    }
+
+    @Override
+    public int deleteSourceByIds(Long[] ids)
+    {
+        return sourceMapper.deleteSourceByIds(ids);
+    }
+}

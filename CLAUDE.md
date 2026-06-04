@@ -4,10 +4,10 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## Project Overview
 
-This is a customized **RuoYi-Vue** rapid development platform — a Spring Boot + Vue3 full-stack web application for enterprise management systems. It is split into two independent subprojects:
+This is a customized **WenDao-Vue** rapid development platform — a Spring Boot + Vue3 full-stack web application for enterprise management systems. It is split into two independent subprojects:
 
-- **`console/`** — Java Spring Boot backend (RuoYi-Vue v3.9.2, Spring Boot 3.5.x, JDK 17)
-- **`ui/`** — Vue 3 + TypeScript + Vite frontend (RuoYi-Vue3-TypeScript)
+- **`console/`** — Java Spring Boot backend (WenDao-Vue v3.9.2, Spring Boot 3.5.x, JDK 17)
+- **`ui/`** — Vue 3 + TypeScript + Vite frontend (WenDao-Vue3-TypeScript)
 
 ## Backend (`console/`)
 
@@ -21,7 +21,7 @@ cd console
 mvn clean package -Dmaven.test.skip=true
 
 # Run the JAR:
-java -jar ruoyi-admin/target/ruoyi-admin.jar
+java -jar wendao-admin/target/wendao-admin.jar
 
 # Or use Maven directly:
 mvn spring-boot:run
@@ -33,12 +33,12 @@ Windows batch scripts are also available under `console/bin/`: `run.bat`, `packa
 
 | Module | Purpose |
 |---|---|
-| `ruoyi-admin` | Entry point (`RuoYiApplication.java`), HTTP controllers, `application.yml` |
-| `ruoyi-framework` | Core infrastructure: Spring Security config, JWT filter, AOP aspects (logging, rate limiting, data scope, dynamic datasource), global exception handler, server monitoring |
-| `ruoyi-system` | Business services, domain entities, MyBatis mappers for system features (user, role, menu, dept, config, dict, notice, login log, operation log) |
-| `ruoyi-quartz` | Scheduled task (cron job) management with Quartz |
-| `ruoyi-generator` | Code generator — generates CRUD Java/Vue/SQL from database tables using Apache Velocity templates |
-| `ruoyi-common` | Shared annotations (`@Log`, `@DataScope`, `@RateLimiter`, `@RepeatSubmit`, `@Anonymous`), base classes (`BaseController`, `BaseEntity`, `TreeEntity`), enums, utilities, XSS/referer filters |
+| `wendao-admin` | Entry point (`WenDaoApplication.java`), HTTP controllers, `application.yml` |
+| `wendao-framework` | Core infrastructure: Spring Security config, JWT filter, AOP aspects (logging, rate limiting, data scope, dynamic datasource), global exception handler, server monitoring |
+| `wendao-system` | Business services, domain entities, MyBatis mappers for system features (user, role, menu, dept, config, dict, notice, login log, operation log) |
+| `wendao-quartz` | Scheduled task (cron job) management with Quartz |
+| `wendao-generator` | Code generator — generates CRUD Java/Vue/SQL from database tables using Apache Velocity templates |
+| `wendao-common` | Shared annotations (`@Log`, `@DataScope`, `@RateLimiter`, `@RepeatSubmit`, `@Anonymous`), base classes (`BaseController`, `BaseEntity`, `TreeEntity`), enums, utilities, XSS/referer filters |
 
 **Layering within each business module:** `controller` → `service`/`service.impl` → `mapper` (MyBatis XML in `resources/mapper/`)
 
@@ -49,11 +49,11 @@ Windows batch scripts are also available under `console/bin/`: `run.bat`, `packa
 - **Server port:** `8080`
 - **Auth:** Stateless JWT (token header: `Authorization: Bearer <token>`, 30-minute expiry). Passwords hashed with BCrypt.
 - **API docs:** SpringDoc/OpenAPI at `/swagger-ui.html` and `/v3/api-docs`
-- **Druid console:** `/druid/*` (login: `ruoyi`/`123456`)
-- **File upload path:** `D:/ruoyi/uploadPath` (configurable via `ruoyi.profile`)
+- **Druid console:** `/druid/*` (login: `wendao`/`123456`)
+- **File upload path:** `D:/wendao/uploadPath` (configurable via `wendao.profile`)
 - **SQL init scripts:** `console/sql/ry_20260417.sql` (main schema), `console/sql/quartz.sql` (Quartz tables)
 
-### Key Custom Annotations (from `ruoyi-common`)
+### Key Custom Annotations (from `wendao-common`)
 
 - `@Anonymous` — marks controller methods as publicly accessible (bypasses Spring Security)
 - `@DataScope` — applies row-level data permission filtering on MyBatis queries
@@ -121,7 +121,7 @@ ui/src/
 ## Adding a New Feature (Full-Stack)
 
 1. Create the database table
-2. Use the code generator (`ruoyi-generator`) via the admin UI at "系统工具 → 代码生成" to scaffold the CRUD code, OR manually:
-   - Backend: Entity in `ruoyi-common` domain package → Mapper interface + XML in `ruoyi-system` → Service + ServiceImpl → Controller in `ruoyi-admin`
+2. Use the code generator (`wendao-generator`) via the admin UI at "系统工具 → 代码生成" to scaffold the CRUD code, OR manually:
+   - Backend: Entity in `wendao-common` domain package → Mapper interface + XML in `wendao-system` → Service + ServiceImpl → Controller in `wendao-admin`
    - Frontend: API module in `ui/src/api/` → View pages in `ui/src/views/` → Add route to the menu via admin UI
 3. If the controller method needs to bypass auth, annotate with `@Anonymous`

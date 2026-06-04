@@ -30,7 +30,7 @@
 <script setup lang="ts">
 import { isExternal } from '@/utils/validate'
 import AppLink from './Link.vue'
-import { getNormalPath } from '@/utils/ruoyi'
+import { getNormalPath } from '@/utils/wendao'
 
 const props = defineProps({
   // route object

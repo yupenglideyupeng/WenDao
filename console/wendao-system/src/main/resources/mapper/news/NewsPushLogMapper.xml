@@ -1,0 +1,63 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper
+PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+"http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.wendao.system.mapper.NewsPushLogMapper">
+
+    <resultMap type="NewsPushLog" id="NewsPushLogResult">
+        <result property="id"         column="id"          />
+        <result property="articleId"  column="article_id"  />
+        <result property="pushTime"   column="push_time"   />
+        <result property="pushStatus" column="push_status" />
+        <result property="pushType"   column="push_type"   />
+        <result property="errorMsg"   column="error_msg"   />
+        <result property="createTime" column="create_time" />
+    </resultMap>
+
+    <sql id="selectNewsPushLogVo">
+        select id, article_id, push_time, push_status, push_type, error_msg, create_time
+        from news_push_log
+    </sql>
+
+    <select id="selectPushLogById" parameterType="Long" resultMap="NewsPushLogResult">
+        <include refid="selectNewsPushLogVo"/>
+        where id = #{id}
+    </select>
+
+    <select id="selectPushLogList" parameterType="NewsPushLog" resultMap="NewsPushLogResult">
+        <include refid="selectNewsPushLogVo"/>
+        <where>
+            <if test="articleId != null">
+                AND article_id = #{articleId}
+            </if>
+            <if test="pushStatus != null and pushStatus != ''">
+                AND push_status = #{pushStatus}
+            </if>
+        </where>
+        order by push_time desc
+    </select>
+
+    <insert id="insertPushLog" parameterType="NewsPushLog">
+        insert into news_push_log (
+            <if test="articleId != null">article_id, </if>
+            <if test="pushStatus != null and pushStatus != ''">push_status, </if>
+            <if test="pushType != null and pushType != ''">push_type, </if>
+            <if test="errorMsg != null">error_msg, </if>
+            create_time
+        )values(
+            <if test="articleId != null">#{articleId}, </if>
+            <if test="pushStatus != null and pushStatus != ''">#{pushStatus}, </if>
+            <if test="pushType != null and pushType != ''">#{pushType}, </if>
+            <if test="errorMsg != null">#{errorMsg}, </if>
+            sysdate()
+        )
+    </insert>
+
+    <delete id="deletePushLogByIds" parameterType="Long">
+        delete from news_push_log where id in
+        <foreach item="id" collection="array" open="(" separator="," close=")">
+            #{id}
+        </foreach>
+    </delete>
+
+</mapper>
