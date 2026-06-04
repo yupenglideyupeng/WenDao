@@ -1,0 +1,103 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper
+PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+"http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.ruoyi.system.mapper.NewsKeywordMapper">
+
+    <resultMap type="NewsKeyword" id="NewsKeywordResult">
+        <result property="id"            column="id"             />
+        <result property="text"          column="text"           />
+        <result property="category"      column="category"       />
+        <result property="isActive"      column="is_active"      />
+        <result property="fetchInterval" column="fetch_interval" />
+        <result property="lastFetchTime" column="last_fetch_time"/>
+        <result property="createBy"      column="create_by"      />
+        <result property="createTime"    column="create_time"    />
+        <result property="updateBy"      column="update_by"      />
+        <result property="updateTime"    column="update_time"    />
+        <result property="remark"        column="remark"         />
+    </resultMap>
+
+    <sql id="selectNewsKeywordVo">
+        select id, text, category, is_active, fetch_interval, last_fetch_time,
+               create_by, create_time, update_by, update_time, remark
+        from news_keyword
+    </sql>
+
+    <select id="selectKeywordById" parameterType="Long" resultMap="NewsKeywordResult">
+        <include refid="selectNewsKeywordVo"/>
+        where id = #{id}
+    </select>
+
+    <select id="selectKeywordList" parameterType="NewsKeyword" resultMap="NewsKeywordResult">
+        <include refid="selectNewsKeywordVo"/>
+        <where>
+            <if test="text != null and text != ''">
+                AND text like concat('%', #{text}, '%')
+            </if>
+            <if test="category != null and category != ''">
+                AND category = #{category}
+            </if>
+            <if test="isActive != null">
+                AND is_active = #{isActive}
+            </if>
+        </where>
+        order by id asc
+    </select>
+
+    <select id="selectActiveKeywords" resultMap="NewsKeywordResult">
+        <include refid="selectNewsKeywordVo"/>
+        where is_active = 1
+        order by id asc
+    </select>
+
+    <insert id="insertKeyword" parameterType="NewsKeyword">
+        insert into news_keyword (
+            <if test="text != null and text != ''">text, </if>
+            <if test="category != null">category, </if>
+            <if test="isActive != null">is_active, </if>
+            <if test="fetchInterval != null">fetch_interval, </if>
+            <if test="remark != null">remark,</if>
+            <if test="createBy != null">create_by,</if>
+            create_time
+        )values(
+            <if test="text != null and text != ''">#{text}, </if>
+            <if test="category != null">#{category}, </if>
+            <if test="isActive != null">#{isActive}, </if>
+            <if test="fetchInterval != null">#{fetchInterval}, </if>
+            <if test="remark != null">#{remark},</if>
+            <if test="createBy != null">#{createBy},</if>
+            sysdate()
+        )
+    </insert>
+
+    <update id="updateKeyword" parameterType="NewsKeyword">
+        update news_keyword
+        <set>
+            <if test="text != null and text != ''">text = #{text}, </if>
+            <if test="category != null">category = #{category}, </if>
+            <if test="isActive != null">is_active = #{isActive}, </if>
+            <if test="fetchInterval != null">fetch_interval = #{fetchInterval}, </if>
+            <if test="remark != null">remark = #{remark},</if>
+            <if test="updateBy != null">update_by = #{updateBy},</if>
+            update_time = sysdate()
+        </set>
+        where id = #{id}
+    </update>
+
+    <update id="updateLastFetchTime" parameterType="Long">
+        update news_keyword set last_fetch_time = sysdate() where id = #{id}
+    </update>
+
+    <delete id="deleteKeywordById" parameterType="Long">
+        delete from news_keyword where id = #{id}
+    </delete>
+
+    <delete id="deleteKeywordByIds" parameterType="Long">
+        delete from news_keyword where id in
+        <foreach item="id" collection="array" open="(" separator="," close=")">
+            #{id}
+        </foreach>
+    </delete>
+
+</mapper>

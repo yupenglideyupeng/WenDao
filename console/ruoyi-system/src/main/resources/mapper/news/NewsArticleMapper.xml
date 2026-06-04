@@ -22,6 +22,13 @@ PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
         <result property="pushTime"     column="push_time"     />
         <result property="readCount"    column="read_count"    />
         <result property="status"       column="status"        />
+        <result property="keywordId"    column="keyword_id"     />
+        <result property="isReal"       column="is_real"        />
+        <result property="relevance"    column="relevance"      />
+        <result property="relevanceReason" column="relevance_reason" />
+        <result property="keywordMentioned" column="keyword_mentioned" />
+        <result property="importance"   column="importance"     />
+        <result property="typeConfigId" column="type_config_id" />
         <result property="createBy"     column="create_by"     />
         <result property="createTime"   column="create_time"   />
         <result property="updateBy"     column="update_by"     />
@@ -33,7 +40,9 @@ PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
         select a.id, a.source_id, s.name as source_name, a.title, a.summary, a.content,
                a.original_url, a.language, a.tags, a.sentiment, a.keywords,
                a.publish_time, a.fetch_time, a.is_pushed, a.push_time, a.read_count,
-               a.status, a.create_by, a.create_time, a.update_by, a.update_time, a.remark
+               a.status, a.keyword_id, a.is_real, a.relevance, a.relevance_reason,
+               a.keyword_mentioned, a.importance, a.type_config_id,
+               a.create_by, a.create_time, a.update_by, a.update_time, a.remark
         from news_article a
         left join news_source s on a.source_id = s.id
     </sql>
@@ -142,6 +151,13 @@ PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
             <if test="publishTime != null">publish_time, </if>
             <if test="isPushed != null">is_pushed, </if>
             <if test="status != null">status, </if>
+            <if test="keywordId != null">keyword_id, </if>
+            <if test="isReal != null">is_real, </if>
+            <if test="relevance != null">relevance, </if>
+            <if test="relevanceReason != null">relevance_reason, </if>
+            <if test="keywordMentioned != null">keyword_mentioned, </if>
+            <if test="importance != null">importance, </if>
+            <if test="typeConfigId != null">type_config_id, </if>
             <if test="createBy != null">create_by,</if>
             create_time
         )values(
@@ -158,6 +174,13 @@ PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
             <if test="publishTime != null">#{publishTime}, </if>
             <if test="isPushed != null">#{isPushed}, </if>
             <if test="status != null">#{status}, </if>
+            <if test="keywordId != null">#{keywordId}, </if>
+            <if test="isReal != null">#{isReal}, </if>
+            <if test="relevance != null">#{relevance}, </if>
+            <if test="relevanceReason != null">#{relevanceReason}, </if>
+            <if test="keywordMentioned != null">#{keywordMentioned}, </if>
+            <if test="importance != null">#{importance}, </if>
+            <if test="typeConfigId != null">#{typeConfigId}, </if>
             <if test="createBy != null">#{createBy},</if>
             sysdate()
         )
@@ -173,6 +196,11 @@ PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
             <if test="sentiment != null">sentiment = #{sentiment}, </if>
             <if test="keywords != null">keywords = #{keywords}, </if>
             <if test="status != null">status = #{status}, </if>
+            <if test="isReal != null">is_real = #{isReal}, </if>
+            <if test="relevance != null">relevance = #{relevance}, </if>
+            <if test="relevanceReason != null">relevance_reason = #{relevanceReason}, </if>
+            <if test="keywordMentioned != null">keyword_mentioned = #{keywordMentioned}, </if>
+            <if test="importance != null">importance = #{importance}, </if>
             <if test="updateBy != null">update_by = #{updateBy},</if>
             update_time = sysdate()
         </set>

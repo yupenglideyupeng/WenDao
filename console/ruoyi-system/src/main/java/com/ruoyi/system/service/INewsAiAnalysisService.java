@@ -11,9 +11,13 @@ public interface INewsAiAnalysisService
 {
     /**
      * 异步分析文章内容，填充摘要、标签、情感、关键词字段
-     * 分析完成后自动更新数据库
-     *
-     * @param article 已保存的文章（必须已设置id字段）
      */
     void analyzeAsync(NewsArticle article);
+
+    /**
+     * 异步深度分析（关键词监控场景），填充isReal/relevance/importance等字段
+     * @param article 文章
+     * @param keyword 监控关键词
+     */
+    void analyzeDeepAsync(NewsArticle article, String keyword);
 }

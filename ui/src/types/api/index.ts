@@ -32,3 +32,6 @@ export * from "./tool/gen";
 export * from "./news/source";
 export * from "./news/article";
 export * from "./news/dashboard";
+export * from "./news/keyword";
+export * from "./news/typeConfig";
+export * from "./news/promptConfig";

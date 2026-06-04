@@ -67,6 +67,27 @@ public class NewsArticle extends BaseEntity
     /** 状态：0=正常 1=下架 */
     private String status;
 
+    /** 关联关键词ID(NULL=来源抓取) */
+    private Long keywordId;
+
+    /** AI判断是否真实：1=真实 0=虚假 */
+    private Integer isReal;
+
+    /** 相关性评分0-100 */
+    private Integer relevance;
+
+    /** AI相关性理由 */
+    private String relevanceReason;
+
+    /** 是否直接提及关键词 */
+    private Integer keywordMentioned;
+
+    /** 重要性：low/medium/high/urgent */
+    private String importance;
+
+    /** 新闻类型ID */
+    private Long typeConfigId;
+
     public Long getId()
     {
         return id;
@@ -236,6 +257,26 @@ public class NewsArticle extends BaseEntity
     {
         this.status = status;
     }
+
+    public Long getKeywordId() { return keywordId; }
+    public void setKeywordId(Long keywordId) { this.keywordId = keywordId; }
+
+    public Integer getIsReal() { return isReal; }
+    public void setIsReal(Integer isReal) { this.isReal = isReal; }
+
+    public Integer getRelevance() { return relevance; }
+    public void setRelevance(Integer relevance) { this.relevance = relevance; }
+
+    public String getRelevanceReason() { return relevanceReason; }
+    public void setRelevanceReason(String relevanceReason) { this.relevanceReason = relevanceReason; }
+
+    public Integer getKeywordMentioned() { return keywordMentioned; }
+    public void setKeywordMentioned(Integer keywordMentioned) { this.keywordMentioned = keywordMentioned; }
+
+    public String getImportance() { return importance; }
+    public void setImportance(String importance) { this.importance = importance; }
+    public Long getTypeConfigId() { return typeConfigId; }
+    public void setTypeConfigId(Long typeConfigId) { this.typeConfigId = typeConfigId; }
 
     @Override
     public String toString() {

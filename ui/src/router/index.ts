@@ -189,6 +189,24 @@ export const dynamicRoutes = [
         component: () => import('@/views/news/article/index.vue'),
         name: 'NewsArticle',
         meta: { title: '文章管理', icon: 'list' }
+      },
+      {
+        path: 'keyword',
+        component: () => import('@/views/news/keyword/index.vue'),
+        name: 'NewsKeyword',
+        meta: { title: '关键词监控', icon: 'monitor' }
+      },
+      {
+        path: 'typeConfig',
+        component: () => import('@/views/news/typeConfig/index.vue'),
+        name: 'NewsTypeConfig',
+        meta: { title: '新闻类型', icon: 'component' }
+      },
+      {
+        path: 'promptConfig',
+        component: () => import('@/views/news/promptConfig/index.vue'),
+        name: 'NewsPromptConfig',
+        meta: { title: '提示词配置', icon: 'documentation' }
       }
     ]
   }

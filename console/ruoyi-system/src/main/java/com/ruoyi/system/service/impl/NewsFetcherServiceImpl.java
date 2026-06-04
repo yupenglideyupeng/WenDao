@@ -30,14 +30,18 @@ import com.alibaba.fastjson2.JSONObject;
 import com.ruoyi.system.event.NewsFetchedEvent;
 import com.ruoyi.common.utils.StringUtils;
 import com.ruoyi.system.domain.NewsArticle;
+import com.ruoyi.system.domain.NewsKeyword;
 import com.ruoyi.system.domain.NewsPushLog;
 import com.ruoyi.system.domain.NewsSource;
 import com.ruoyi.system.mapper.NewsArticleMapper;
+import com.ruoyi.system.mapper.NewsKeywordMapper;
 import com.ruoyi.system.service.INewsAiAnalysisService;
 import com.ruoyi.system.service.INewsArticleService;
 import com.ruoyi.system.service.INewsFetcherService;
+import com.ruoyi.system.service.INewsKeywordService;
 import com.ruoyi.system.service.INewsPushLogService;
 import com.ruoyi.system.service.INewsSourceService;
+import com.ruoyi.system.service.IWebSearchService;
 
 /**
  * 新闻抓取 服务层实现
@@ -67,6 +71,15 @@ public class NewsFetcherServiceImpl implements INewsFetcherService
     @Autowired
     private INewsAiAnalysisService aiAnalysisService;
 
+    @Autowired
+    private IWebSearchService webSearchService;
+
+    @Autowired
+    private INewsKeywordService keywordService;
+
+    @Autowired
+    private NewsKeywordMapper keywordMapper;
+
     private final RestTemplate restTemplate = new RestTemplate();
 
     /**
@@ -76,8 +89,9 @@ public class NewsFetcherServiceImpl implements INewsFetcherService
     public void scheduledFetch()
     {
         log.info("定时抓取新闻任务开始");
-        int count = fetchAllSources();
-        log.info("定时抓取新闻任务完成，共抓取 {} 篇", count);
+        int sourceCount = fetchAllSources();
+        int keywordCount = fetchByKeywords();
+        log.info("定时抓取新闻任务完成，来源抓取 {} 篇，关键词搜索 {} 篇", sourceCount, keywordCount);
     }
 
     @Override
@@ -123,6 +137,12 @@ public class NewsFetcherServiceImpl implements INewsFetcherService
                 break;
             case "API":
                 articles = fetchApi(source);
+                break;
+            case "SEARCH":
+                // 搜索引擎源由关键词监控驱动，此处跳过
+                return 0;
+            case "CRAWL":
+                articles = fetchCrawl(source);
                 break;
             default:
                 log.warn("不支持的抓取方式: {} (来源: {})", source.getFetchType(), source.getName());
@@ -180,9 +200,23 @@ public class NewsFetcherServiceImpl implements INewsFetcherService
             ResponseEntity<String> response = restTemplate.getForEntity(source.getUrl(), String.class);
             if (response.getStatusCode().is2xxSuccessful() && response.getBody() != null)
             {
+                String body = response.getBody();
+
+                // 检测是否返回了HTML页面而非RSS XML（某些源会重定向或返回HTML）
+                String trimmed = body.trim().toLowerCase();
+                if (trimmed.startsWith("<!doctype html") || trimmed.startsWith("<html"))
+                {
+                    log.warn("RSS源 [{}] 返回的是HTML页面而非RSS XML，跳过解析", source.getName());
+                    return articles;
+                }
+
                 DocumentBuilderFactory factory = DocumentBuilderFactory.newInstance();
+                // 禁用外部DTD加载，避免网络超时和安全问题
+                factory.setFeature("http://apache.org/xml/features/nonvalidating/load-external-dtd", false);
+                factory.setFeature("http://xml.org/sax/features/validation", false);
+                factory.setNamespaceAware(false);
                 DocumentBuilder builder = factory.newDocumentBuilder();
-                Document doc = builder.parse(new InputSource(new StringReader(response.getBody())));
+                Document doc = builder.parse(new InputSource(new StringReader(body)));
                 NodeList items = doc.getElementsByTagName("item");
                 if (items.getLength() == 0)
                 {
@@ -412,6 +446,130 @@ public class NewsFetcherServiceImpl implements INewsFetcherService
             return list.item(0).getTextContent();
         }
         return null;
+    }
+
+    /**
+     * 关键词驱动的热点搜索
+     */
+    private int fetchByKeywords()
+    {
+        List<NewsKeyword> keywords = keywordService.selectActiveKeywords();
+        if (keywords.isEmpty())
+        {
+            return 0;
+        }
+        log.info("关键词搜索开始，共 {} 个激活关键词", keywords.size());
+        int totalCount = 0;
+
+        for (NewsKeyword kw : keywords)
+        {
+            try
+            {
+                // 检查间隔
+                if (kw.getLastFetchTime() != null && kw.getFetchInterval() != null)
+                {
+                    long elapsed = System.currentTimeMillis() - kw.getLastFetchTime().getTime();
+                    if (elapsed < kw.getFetchInterval() * 60L * 1000L)
+                    {
+                        continue;
+                    }
+                }
+
+                log.info("搜索关键词: {}", kw.getText());
+                List<NewsArticle> results = webSearchService.searchByKeyword(kw.getText());
+
+                int kwCount = 0;
+                for (NewsArticle article : results)
+                {
+                    try
+                    {
+                        if (StringUtils.isNotEmpty(article.getOriginalUrl()))
+                        {
+                            NewsArticle exist = articleMapper.selectArticleByUrl(article.getOriginalUrl());
+                            if (exist != null) continue;
+                        }
+                        if (StringUtils.isEmpty(article.getTitle())) continue;
+
+                        article.setSourceId(null);
+                        article.setKeywordId(kw.getId());
+                        article.setIsPushed("0");
+                        article.setReadCount(0);
+                        article.setStatus("0");
+                        if (StringUtils.isEmpty(article.getLanguage()))
+                        {
+                            article.setLanguage("zh");
+                        }
+
+                        newsArticleService.insertArticle(article);
+                        // 深度AI分析（含真假判断+相关性+重要性）
+                        aiAnalysisService.analyzeDeepAsync(article, kw.getText());
+                        kwCount++;
+                    }
+                    catch (Exception e)
+                    {
+                        log.error("保存关键词搜索结果失败: {}", article.getTitle(), e);
+                    }
+                }
+
+                // 更新上次抓取时间
+                keywordMapper.updateLastFetchTime(kw.getId());
+                totalCount += kwCount;
+                if (kwCount > 0)
+                {
+                    log.info("关键词 [{}] 搜索完成，新增 {} 篇文章", kw.getText(), kwCount);
+                }
+            }
+            catch (Exception e)
+            {
+                log.error("搜索关键词 [{}] 失败: {}", kw.getText(), e.getMessage());
+            }
+        }
+
+        return totalCount;
+    }
+
+    /**
+     * CRAWL爬虫抓取（Jsoup HTML解析）
+     */
+    private List<NewsArticle> fetchCrawl(NewsSource source)
+    {
+        List<NewsArticle> articles = new ArrayList<>();
+        try
+        {
+            org.jsoup.nodes.Document doc = org.jsoup.Jsoup.connect(source.getUrl())
+                    .userAgent("Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36")
+                    .timeout(15000)
+                    .get();
+
+            // 通用爬取策略：提取页面中的标题和链接
+            org.jsoup.select.Elements links = doc.select("a[href]");
+            java.util.Set<String> seenUrls = new java.util.HashSet<>();
+
+            for (org.jsoup.nodes.Element link : links)
+            {
+                String title = link.text().trim();
+                String url = link.absUrl("href");
+
+                if (title.length() < 10 || title.length() > 200) continue;
+                if (!url.startsWith("http")) continue;
+                if (seenUrls.contains(url)) continue;
+                seenUrls.add(url);
+
+                NewsArticle article = new NewsArticle();
+                article.setTitle(title);
+                article.setOriginalUrl(url);
+                article.setPublishTime(new Date());
+                articles.add(article);
+
+                if (articles.size() >= 20) break;
+            }
+            log.info("CRAWL抓取 [{}] 获取 {} 条", source.getName(), articles.size());
+        }
+        catch (Exception e)
+        {
+            log.error("CRAWL抓取失败: {} - {}", source.getName(), e.getMessage());
+        }
+        return articles;
     }
 
     private Date parseDate(String dateStr)
