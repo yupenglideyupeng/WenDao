@@ -1,5 +1,7 @@
 package com.ruoyi.system.service.impl;
 
+import java.util.List;
+import java.util.stream.Collectors;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -17,12 +19,14 @@ import com.ruoyi.common.utils.StringUtils;
 import com.ruoyi.system.config.NewsAiProperties;
 import com.ruoyi.system.domain.NewsArticle;
 import com.ruoyi.system.domain.NewsPromptConfig;
+import com.ruoyi.system.domain.NewsTypeConfig;
 import com.ruoyi.system.service.INewsAiAnalysisService;
 import com.ruoyi.system.service.INewsArticleService;
 import com.ruoyi.system.service.INewsPromptConfigService;
+import com.ruoyi.system.service.INewsTypeConfigService;
 
 /**
- * AI新闻分析 服务层实现（提示词从DB读取）
+ * AI新闻分析 服务层实现（提示词从DB读取，AI自动分类）
  *
  * @author ruoyi
  */
@@ -39,6 +43,9 @@ public class NewsAiAnalysisServiceImpl implements INewsAiAnalysisService
 
     @Autowired
     private INewsPromptConfigService promptConfigService;
+
+    @Autowired
+    private INewsTypeConfigService typeConfigService;
 
     private final RestTemplate restTemplate = new RestTemplate();
 
@@ -74,12 +81,20 @@ public class NewsAiAnalysisServiceImpl implements INewsAiAnalysisService
             return;
         }
 
+        // 检查数据库中是否有启用的新闻类型，没有则不进行分析
+        List<NewsTypeConfig> activeTypes = typeConfigService.selectActive();
+        if (activeTypes.isEmpty())
+        {
+            log.debug("无启用的新闻类型配置，跳过AI分析 [{}]", article.getTitle());
+            return;
+        }
+
         try
         {
             // 从DB查找匹配的提示词配置
             NewsPromptConfig promptCfg = findPromptConfig(article, promptType);
 
-            JSONObject requestBody = buildRequestBody(article, keyword, promptCfg);
+            JSONObject requestBody = buildRequestBody(article, keyword, promptCfg, activeTypes);
 
             HttpHeaders headers = new HttpHeaders();
             headers.setContentType(MediaType.APPLICATION_JSON);
@@ -109,7 +124,8 @@ public class NewsAiAnalysisServiceImpl implements INewsAiAnalysisService
             parseAiResult(article, aiContent, isDeep);
 
             newsArticleService.updateArticle(article);
-            log.info("AI分析完成，文章 [{}] type={} sentiment={}", article.getTitle(), promptType, article.getSentiment());
+            log.info("AI分析完成，文章 [{}] typeConfigId={} sentiment={}",
+                    article.getTitle(), article.getTypeConfigId(), article.getSentiment());
         }
         catch (Exception e)
         {
@@ -118,7 +134,8 @@ public class NewsAiAnalysisServiceImpl implements INewsAiAnalysisService
     }
 
     /**
-     * 查找匹配的提示词配置，按优先级：文章类型+promptType > promptType（不限类型） > 兜底
+     * 查找匹配的提示词配置
+     * 优先级：文章typeConfigId+promptType > promptType（不限类型） > 兜底
      */
     private NewsPromptConfig findPromptConfig(NewsArticle article, String promptType)
     {
@@ -126,13 +143,25 @@ public class NewsAiAnalysisServiceImpl implements INewsAiAnalysisService
         if (article.getTypeConfigId() != null)
         {
             NewsPromptConfig cfg = promptConfigService.selectMatch(article.getTypeConfigId(), promptType);
-            if (cfg != null) return cfg;
+            if (cfg != null)
+            {
+                log.debug("精确匹配提示词 typeConfigId={} promptType={}", article.getTypeConfigId(), promptType);
+                return cfg;
+            }
         }
         // 2. 降级：只按 promptType 查找
-        return promptConfigService.selectMatch(null, promptType);
+        NewsPromptConfig cfg = promptConfigService.selectMatch(null, promptType);
+        if (cfg != null)
+        {
+            log.debug("降级匹配提示词 promptType={}", promptType);
+        }
+        return cfg;
     }
 
-    private JSONObject buildRequestBody(NewsArticle article, String keyword, NewsPromptConfig promptCfg)
+    /**
+     * 构建DeepSeek API请求体
+     */
+    private JSONObject buildRequestBody(NewsArticle article, String keyword, NewsPromptConfig promptCfg, List<NewsTypeConfig> activeTypes)
     {
         JSONObject body = new JSONObject();
 
@@ -147,6 +176,13 @@ public class NewsAiAnalysisServiceImpl implements INewsAiAnalysisService
             if (promptCfg.getTemperature() != null) temperature = promptCfg.getTemperature();
             if (promptCfg.getMaxTokens() != null) maxTokens = promptCfg.getMaxTokens();
             if (StringUtils.isNotEmpty(promptCfg.getSystemPrompt())) systemPrompt = promptCfg.getSystemPrompt();
+        }
+
+        // 把可用新闻类型列表注入 system_prompt，让AI自动分类
+        String typeHint = buildTypeHint(activeTypes);
+        if (StringUtils.isNotEmpty(typeHint))
+        {
+            systemPrompt = systemPrompt + "\n\n" + typeHint;
         }
 
         body.put("model", model);
@@ -174,6 +210,23 @@ public class NewsAiAnalysisServiceImpl implements INewsAiAnalysisService
         return body;
     }
 
+    /**
+     * 构建可用新闻类型提示（让AI返回typeCode字段实现自动分类）
+     */
+    private String buildTypeHint(List<NewsTypeConfig> types)
+    {
+        if (types.isEmpty()) return "";
+
+        String typeList = types.stream()
+                .map(t -> t.getTypeCode() + ":" + t.getTypeName())
+                .collect(Collectors.joining(", "));
+
+        return "【新闻类型分类】请根据文章内容判断它属于以下哪个类型，并在返回的JSON中增加 \"typeCode\" 字段（从下列code中选择最匹配的一个）。"
+                + "如果无法判断，请选择最接近的类型。\n"
+                + "可用类型：" + typeList + "\n"
+                + "示例返回：{\"typeCode\":\"ai_tech\",\"summary\":\"...\",\"tags\":[...],\"sentiment\":\"neutral\",\"keywords\":\"...\"}";
+    }
+
     private String buildUserContent(NewsArticle article)
     {
         StringBuilder sb = new StringBuilder();
@@ -193,6 +246,9 @@ public class NewsAiAnalysisServiceImpl implements INewsAiAnalysisService
         return sb.toString();
     }
 
+    /**
+     * 解析AI返回的JSON结果，填充到文章实体中
+     */
     private void parseAiResult(NewsArticle article, String aiContent, boolean deep)
     {
         String jsonStr = aiContent.trim();
@@ -203,6 +259,8 @@ public class NewsAiAnalysisServiceImpl implements INewsAiAnalysisService
         try
         {
             JSONObject result = JSON.parseObject(jsonStr);
+
+            // === 基础字段 ===
             article.setSummary(result.getString("summary"));
             article.setSentiment(result.getString("sentiment"));
 
@@ -212,6 +270,24 @@ public class NewsAiAnalysisServiceImpl implements INewsAiAnalysisService
 
             article.setKeywords(result.getString("keywords"));
 
+            // === AI自动分类：typeCode → typeConfigId ===
+            String typeCode = result.getString("typeCode");
+            if (StringUtils.isNotEmpty(typeCode))
+            {
+                NewsTypeConfig typeConfig = typeConfigService.selectByCode(typeCode.trim());
+                if (typeConfig != null)
+                {
+                    article.setTypeConfigId(typeConfig.getId());
+                    log.debug("AI自动分类：typeCode={} → typeConfigId={} ({})",
+                            typeCode, typeConfig.getId(), typeConfig.getTypeName());
+                }
+                else
+                {
+                    log.debug("AI返回的typeCode [{}] 未匹配到任何类型配置", typeCode);
+                }
+            }
+
+            // === 深度分析字段 ===
             if (deep)
             {
                 if (result.containsKey("isReal"))

@@ -4,6 +4,11 @@
       <el-form-item label="文章标题" prop="title">
         <el-input v-model="queryParams.title" placeholder="请输入文章标题" clearable @keyup.enter="handleQuery" />
       </el-form-item>
+      <el-form-item label="新闻类型" prop="typeConfigId">
+        <el-select v-model="queryParams.typeConfigId" placeholder="请选择" clearable>
+          <el-option v-for="t in typeOptions" :key="t.id" :label="t.typeName" :value="t.id" />
+        </el-select>
+      </el-form-item>
       <el-form-item label="语言" prop="language">
         <el-select v-model="queryParams.language" placeholder="请选择语言" clearable>
           <el-option label="中文" value="zh" />
@@ -47,6 +52,12 @@
         </template>
       </el-table-column>
       <el-table-column label="来源" align="center" prop="sourceName" width="120" />
+      <el-table-column label="类型" align="center" prop="typeName" width="100">
+        <template #default="scope">
+          <el-tag size="small" v-if="scope.row.typeName">{{ scope.row.typeName }}</el-tag>
+          <span v-else style="color:#909399;font-size:12px">-</span>
+        </template>
+      </el-table-column>
       <el-table-column label="语言" align="center" prop="language" width="70">
         <template #default="scope">
           <el-tag :type="scope.row.language === 'zh' ? '' : 'info'" size="small">
@@ -85,6 +96,10 @@
         <el-descriptions :column="2" border>
           <el-descriptions-item label="标题" :span="2">{{ detail.title }}</el-descriptions-item>
           <el-descriptions-item label="来源">{{ detail.sourceName }}</el-descriptions-item>
+          <el-descriptions-item label="新闻类型">
+            <el-tag size="small" v-if="detail.typeName">{{ detail.typeName }}</el-tag>
+            <span v-else style="color:#909399">未分类</span>
+          </el-descriptions-item>
           <el-descriptions-item label="语言">{{ detail.language === 'zh' ? '中文' : detail.language === 'en' ? '英文' : detail.language }}</el-descriptions-item>
           <el-descriptions-item label="情感">
             <el-tag :type="sentimentType(detail.sentiment)" size="small" v-if="detail.sentiment">{{ sentimentLabel(detail.sentiment) }}</el-tag>
@@ -107,7 +122,9 @@
 
 <script setup lang="ts" name="NewsArticle">
 import { listArticle, getArticle, delArticle } from '@/api/news/article'
+import { listType } from '@/api/news/typeConfig'
 import type { NewsArticle, NewsArticleQueryParams } from '@/types/api/news/article'
+import type { NewsTypeConfig } from '@/types/api/news/typeConfig'
 
 const { proxy } = getCurrentInstance()
 
@@ -121,12 +138,14 @@ const total = ref(0)
 const detailOpen = ref(false)
 const detailTitle = ref('')
 const detail = ref<NewsArticle>()
+const typeOptions = ref<NewsTypeConfig[]>([])
 
 const data = reactive({
   queryParams: {
     pageNum: 1,
     pageSize: 10,
     title: undefined,
+    typeConfigId: undefined,
     language: undefined,
     sentiment: undefined,
     isPushed: undefined
@@ -134,6 +153,13 @@ const data = reactive({
 })
 
 const { queryParams } = toRefs(data)
+
+async function loadTypeOptions() {
+  try {
+    const r = await listType({ pageNum: 1, pageSize: 100, isActive: 1 })
+    typeOptions.value = r.rows || []
+  } catch (e) {}
+}
 
 function getList() {
   loading.value = true
@@ -199,6 +225,7 @@ function parseTags(tags?: string): string[] {
   }
 }
 
+loadTypeOptions()
 getList()
 </script>
 

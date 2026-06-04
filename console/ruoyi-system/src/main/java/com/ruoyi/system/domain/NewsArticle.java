@@ -88,6 +88,9 @@ public class NewsArticle extends BaseEntity
     /** 新闻类型ID */
     private Long typeConfigId;
 
+    /** 新闻类型名称（非数据库字段，展示用） */
+    private String typeName;
+
     public Long getId()
     {
         return id;
@@ -277,6 +280,8 @@ public class NewsArticle extends BaseEntity
     public void setImportance(String importance) { this.importance = importance; }
     public Long getTypeConfigId() { return typeConfigId; }
     public void setTypeConfigId(Long typeConfigId) { this.typeConfigId = typeConfigId; }
+    public String getTypeName() { return typeName; }
+    public void setTypeName(String typeName) { this.typeName = typeName; }
 
     @Override
     public String toString() {

@@ -7,6 +7,7 @@ export interface NewsArticleQueryParams extends PageDomain {
   language?: string
   sentiment?: string
   isPushed?: string
+  typeConfigId?: number
   status?: string
   beginTime?: string
   endTime?: string
@@ -31,4 +32,6 @@ export interface NewsArticle extends BaseEntity {
   pushTime?: string
   readCount?: number
   status?: string
+  typeConfigId?: number
+  typeName?: string
 }
