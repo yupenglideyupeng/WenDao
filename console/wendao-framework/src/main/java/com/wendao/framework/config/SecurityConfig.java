@@ -106,6 +106,8 @@ public class SecurityConfig
                     .requestMatchers("/swagger-ui.html", "/v3/api-docs/**", "/swagger-ui/**", "/druid/**").permitAll()
                     // WebSocket端点允许匿名访问（认证在HandshakeInterceptor中处理）
                     .requestMatchers("/ws/news/**").permitAll()
+                    // SSE解读接口允许匿名访问（认证通过query param token在Controller中处理）
+                    .requestMatchers("/news/article/interpret/**").permitAll()
                     // 除上面外的所有请求全部需要鉴权认证
                     .anyRequest().authenticated();
             })

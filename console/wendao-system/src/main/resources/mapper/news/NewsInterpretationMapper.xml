@@ -1,0 +1,69 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.wendao.system.mapper.NewsInterpretationMapper">
+
+    <resultMap type="com.wendao.system.domain.NewsInterpretation" id="NewsInterpretationResult">
+        <id     property="id"              column="id"               />
+        <result property="articleId"       column="article_id"       />
+        <result property="promptConfigId"  column="prompt_config_id" />
+        <result property="promptSnapshot"  column="prompt_snapshot"  />
+        <result property="content"         column="content"          />
+        <result property="status"          column="status"           />
+        <result property="errorMsg"        column="error_msg"        />
+        <result property="tokensUsed"      column="tokens_used"      />
+        <result property="modelName"       column="model_name"       />
+        <result property="interpretCount"  column="interpret_count"  />
+        <result property="createBy"        column="create_by"        />
+        <result property="createTime"      column="create_time"      />
+        <result property="updateTime"      column="update_time"      />
+    </resultMap>
+
+    <!-- 查询某篇文章最新一条解读记录 -->
+    <select id="selectLatestByArticleId" parameterType="Long" resultMap="NewsInterpretationResult">
+        SELECT id, article_id, prompt_config_id, prompt_snapshot, content,
+               status, error_msg, tokens_used, model_name, interpret_count,
+               create_by, create_time, update_time
+        FROM news_interpretation
+        WHERE article_id = #{articleId}
+        ORDER BY id DESC
+        LIMIT 1
+    </select>
+
+    <!-- 查询某篇文章的所有解读记录（按时间倒序） -->
+    <select id="selectListByArticleId" parameterType="Long" resultMap="NewsInterpretationResult">
+        SELECT id, article_id, prompt_config_id, prompt_snapshot, content,
+               status, error_msg, tokens_used, model_name, interpret_count,
+               create_by, create_time, update_time
+        FROM news_interpretation
+        WHERE article_id = #{articleId}
+        ORDER BY id DESC
+    </select>
+
+    <!-- 新增解读记录 -->
+    <insert id="insert" parameterType="com.wendao.system.domain.NewsInterpretation" useGeneratedKeys="true" keyProperty="id">
+        INSERT INTO news_interpretation (
+            article_id, prompt_config_id, prompt_snapshot, content,
+            status, error_msg, tokens_used, model_name, interpret_count,
+            create_by, create_time, update_time
+        ) VALUES (
+            #{articleId}, #{promptConfigId}, #{promptSnapshot}, #{content},
+            #{status}, #{errorMsg}, #{tokensUsed}, #{modelName}, #{interpretCount},
+            #{createBy}, NOW(), NOW()
+        )
+    </insert>
+
+    <!-- 更新解读记录 -->
+    <update id="update" parameterType="com.wendao.system.domain.NewsInterpretation">
+        UPDATE news_interpretation
+        <set>
+            <if test="content != null">content = #{content},</if>
+            <if test="status != null">status = #{status},</if>
+            <if test="errorMsg != null">error_msg = #{errorMsg},</if>
+            <if test="tokensUsed != null">tokens_used = #{tokensUsed},</if>
+            <if test="modelName != null">model_name = #{modelName},</if>
+            update_time = NOW()
+        </set>
+        WHERE id = #{id}
+    </update>
+
+</mapper>
