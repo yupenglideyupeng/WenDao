@@ -6,7 +6,9 @@ import java.time.ZoneId;
 import java.time.format.DateTimeFormatter;
 import java.util.ArrayList;
 import java.util.Date;
+import java.util.HashSet;
 import java.util.List;
+import java.util.Set;
 import javax.xml.parsers.DocumentBuilder;
 import javax.xml.parsers.DocumentBuilderFactory;
 import org.slf4j.Logger;
@@ -41,6 +43,7 @@ import com.wendao.system.service.INewsFetcherService;
 import com.wendao.system.service.INewsKeywordService;
 import com.wendao.system.service.INewsPushLogService;
 import com.wendao.system.service.INewsSourceService;
+import com.wendao.system.service.IQueryExpansionService;
 import com.wendao.system.service.IWebSearchService;
 
 /**
@@ -80,18 +83,21 @@ public class NewsFetcherServiceImpl implements INewsFetcherService
     @Autowired
     private NewsKeywordMapper keywordMapper;
 
+    @Autowired
+    private IQueryExpansionService queryExpansionService;
+
     private final RestTemplate restTemplate = new RestTemplate();
 
     /**
-     * 定时抓取新闻（每5分钟）
+     * 定时抓取新闻（每5分钟）- 关键词驱动优先
      */
     @Scheduled(fixedDelayString = "${news.fetch-interval:300000}")
     public void scheduledFetch()
     {
         log.info("定时抓取新闻任务开始");
-        int sourceCount = fetchAllSources();
         int keywordCount = fetchByKeywords();
-        log.info("定时抓取新闻任务完成，来源抓取 {} 篇，关键词搜索 {} 篇", sourceCount, keywordCount);
+        int sourceCount = fetchPrimarySources();
+        log.info("定时抓取完成，关键词搜索 {} 篇，PRIMARY来源 {} 篇", keywordCount, sourceCount);
     }
 
     @Override
@@ -112,6 +118,29 @@ public class NewsFetcherServiceImpl implements INewsFetcherService
             }
         }
         // 推送未推送的文章
+        pushUnpushedArticles(null);
+        return totalCount;
+    }
+
+    /**
+     * 仅抓取PRIMARY模式的高质量来源
+     */
+    private int fetchPrimarySources()
+    {
+        List<NewsSource> sources = newsSourceService.selectPrimarySources();
+        int totalCount = 0;
+        for (NewsSource source : sources)
+        {
+            try
+            {
+                int count = fetchFromSource(source);
+                totalCount += count;
+            }
+            catch (Exception e)
+            {
+                log.error("抓取PRIMARY源 [{}] 失败: {}", source.getName(), e.getMessage());
+            }
+        }
         pushUnpushedArticles(null);
         return totalCount;
     }
@@ -149,8 +178,11 @@ public class NewsFetcherServiceImpl implements INewsFetcherService
                 return 0;
         }
         int count = 0;
+        int maxArticles = source.getMaxArticlesPerFetch() != null ? source.getMaxArticlesPerFetch() : 10;
+        boolean isPrimary = "PRIMARY".equals(source.getFetchMode());
         for (NewsArticle article : articles)
         {
+            if (count >= maxArticles) break; // 配额控制
             try
             {
                 // 去重检查
@@ -167,14 +199,22 @@ public class NewsFetcherServiceImpl implements INewsFetcherService
                 article.setIsPushed("0");
                 article.setReadCount(0);
                 article.setStatus("0");
+                article.setFetchOrigin("SOURCE");
                 // 根据来源类型设置语言
                 if (StringUtils.isEmpty(article.getLanguage()))
                 {
                     article.setLanguage("1".equals(source.getType()) ? "en" : "zh");
                 }
                 newsArticleService.insertArticle(article);
-                // AI分析（异步，不阻塞抓取流程）
-                aiAnalysisService.analyzeAsync(article);
+                // PRIMARY高质量源启用深度AI分析，其他使用基础分析
+                if (isPrimary)
+                {
+                    aiAnalysisService.analyzeDeepAsync(article, null, 0);
+                }
+                else
+                {
+                    aiAnalysisService.analyzeAsync(article);
+                }
                 count++;
             }
             catch (Exception e)
@@ -222,7 +262,7 @@ public class NewsFetcherServiceImpl implements INewsFetcherService
                 {
                     items = doc.getElementsByTagName("entry");
                 }
-                int limit = Math.min(items.getLength(), 20);
+                int limit = Math.min(items.getLength(), source.getMaxArticlesPerFetch() != null ? source.getMaxArticlesPerFetch() : 10);
                 for (int i = 0; i < limit; i++)
                 {
                     Element item = (Element) items.item(i);
@@ -350,6 +390,92 @@ public class NewsFetcherServiceImpl implements INewsFetcherService
                     }
                 }
             }
+            else if (source.getUrl().contains("zhihu"))
+            {
+                // 知乎热榜: data[].target.title / target.excerpt / target.url
+                JSONObject json = JSON.parseObject(body);
+                JSONArray dataList = json.getJSONArray("data");
+                if (dataList != null)
+                {
+                    int limit = Math.min(dataList.size(), 20);
+                    for (int i = 0; i < limit; i++)
+                    {
+                        try
+                        {
+                            JSONObject item = dataList.getJSONObject(i);
+                            JSONObject target = item.getJSONObject("target");
+                            if (target == null) continue;
+                            NewsArticle article = new NewsArticle();
+                            article.setTitle(target.getString("title"));
+                            String url = target.getString("url");
+                            if (StringUtils.isNotEmpty(url))
+                            {
+                                article.setOriginalUrl(url);
+                            }
+                            else
+                            {
+                                // 知乎热榜有时没有url，构造搜索链接
+                                article.setOriginalUrl("https://www.zhihu.com/search?type=content&q=" +
+                                        java.net.URLEncoder.encode(article.getTitle(), "UTF-8"));
+                            }
+                            article.setSummary(target.getString("excerpt"));
+                            article.setPublishTime(new Date());
+                            article.setLanguage("zh");
+                            if (StringUtils.isNotEmpty(article.getTitle()))
+                            {
+                                articles.add(article);
+                            }
+                        }
+                        catch (Exception e)
+                        {
+                            log.error("解析知乎热榜条目失败", e);
+                        }
+                    }
+                }
+            }
+            else if (source.getUrl().contains("weibo"))
+            {
+                // 微博热搜: data.realtime[].word / num(热度) / label_name
+                JSONObject json = JSON.parseObject(body);
+                JSONObject data = json.getJSONObject("data");
+                if (data != null)
+                {
+                    JSONArray realtime = data.getJSONArray("realtime");
+                    if (realtime != null)
+                    {
+                        int limit = Math.min(realtime.size(), 20);
+                        for (int i = 0; i < limit; i++)
+                        {
+                            try
+                            {
+                                JSONObject item = realtime.getJSONObject(i);
+                                String word = item.getString("word");
+                                if (StringUtils.isEmpty(word)) continue;
+                                NewsArticle article = new NewsArticle();
+                                article.setTitle(word);
+                                article.setOriginalUrl("https://s.weibo.com/weibo?q=%23" +
+                                        java.net.URLEncoder.encode(word, "UTF-8") + "%23");
+                                // 用热度数和标签生成摘要
+                                long num = item.getLongValue("num");
+                                String label = item.getString("label_name");
+                                StringBuilder summary = new StringBuilder("热搜热度: " + num);
+                                if (StringUtils.isNotEmpty(label))
+                                {
+                                    summary.append(" [").append(label).append("]");
+                                }
+                                article.setSummary(summary.toString());
+                                article.setPublishTime(new Date());
+                                article.setLanguage("zh");
+                                articles.add(article);
+                            }
+                            catch (Exception e)
+                            {
+                                log.error("解析微博热搜条目失败", e);
+                            }
+                        }
+                    }
+                }
+            }
             else
             {
                 // 通用JSON解析
@@ -449,7 +575,7 @@ public class NewsFetcherServiceImpl implements INewsFetcherService
     }
 
     /**
-     * 关键词驱动的热点搜索
+     * 关键词驱动的热点搜索（含查询扩展）
      */
     private int fetchByKeywords()
     {
@@ -475,11 +601,36 @@ public class NewsFetcherServiceImpl implements INewsFetcherService
                     }
                 }
 
-                log.info("搜索关键词: {}", kw.getText());
-                List<NewsArticle> results = webSearchService.searchByKeyword(kw.getText());
+                // 1. 查询扩展：获取搜索词列表（含原始词）
+                List<String> searchTerms = queryExpansionService.expand(kw.getText(), kw.getId());
+                log.info("搜索关键词: {}，扩展词: {}", kw.getText(), searchTerms);
 
+                // 2. 多词搜索 + 合并去重
+                Set<String> seenUrls = new HashSet<>();
+                List<NewsArticle> allResults = new ArrayList<>();
+                for (String term : searchTerms)
+                {
+                    try
+                    {
+                        List<NewsArticle> results = webSearchService.searchByKeyword(term);
+                        for (NewsArticle a : results)
+                        {
+                            if (StringUtils.isNotEmpty(a.getOriginalUrl()) && seenUrls.add(a.getOriginalUrl()))
+                            {
+                                allResults.add(a);
+                            }
+                        }
+                    }
+                    catch (Exception e)
+                    {
+                        log.error("搜索扩展词 [{}] 失败: {}", term, e.getMessage());
+                    }
+                }
+
+                // 3. 保存 + 标记来源方式 + 深度AI分析（带阈值）
+                int threshold = kw.getRelevanceThreshold() != null ? kw.getRelevanceThreshold() : 40;
                 int kwCount = 0;
-                for (NewsArticle article : results)
+                for (NewsArticle article : allResults)
                 {
                     try
                     {
@@ -495,14 +646,15 @@ public class NewsFetcherServiceImpl implements INewsFetcherService
                         article.setIsPushed("0");
                         article.setReadCount(0);
                         article.setStatus("0");
+                        article.setFetchOrigin("KEYWORD");
                         if (StringUtils.isEmpty(article.getLanguage()))
                         {
                             article.setLanguage("zh");
                         }
 
                         newsArticleService.insertArticle(article);
-                        // 深度AI分析（含真假判断+相关性+重要性）
-                        aiAnalysisService.analyzeDeepAsync(article, kw.getText());
+                        // 深度AI分析（含真假判断+相关性+重要性+阈值过滤）
+                        aiAnalysisService.analyzeDeepAsync(article, kw.getText(), threshold);
                         kwCount++;
                     }
                     catch (Exception e)
@@ -516,7 +668,7 @@ public class NewsFetcherServiceImpl implements INewsFetcherService
                 totalCount += kwCount;
                 if (kwCount > 0)
                 {
-                    log.info("关键词 [{}] 搜索完成，新增 {} 篇文章", kw.getText(), kwCount);
+                    log.info("关键词 [{}] 搜索完成，新增 {} 篇文章（含扩展词搜索）", kw.getText(), kwCount);
                 }
             }
             catch (Exception e)
@@ -561,7 +713,7 @@ public class NewsFetcherServiceImpl implements INewsFetcherService
                 article.setPublishTime(new Date());
                 articles.add(article);
 
-                if (articles.size() >= 20) break;
+                if (articles.size() >= (source.getMaxArticlesPerFetch() != null ? source.getMaxArticlesPerFetch() : 10)) break;
             }
             log.info("CRAWL抓取 [{}] 获取 {} 条", source.getName(), articles.size());
         }

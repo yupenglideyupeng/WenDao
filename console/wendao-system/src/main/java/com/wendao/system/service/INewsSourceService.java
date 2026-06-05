@@ -16,6 +16,8 @@ public interface INewsSourceService
 
     public List<NewsSource> selectEnabledSources();
 
+    public List<NewsSource> selectPrimarySources();
+
     public int insertSource(NewsSource source);
 
     public int updateSource(NewsSource source);

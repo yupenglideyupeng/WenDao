@@ -11,6 +11,8 @@ PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
         <result property="isActive"      column="is_active"      />
         <result property="fetchInterval" column="fetch_interval" />
         <result property="lastFetchTime" column="last_fetch_time"/>
+        <result property="relevanceThreshold" column="relevance_threshold" />
+        <result property="expandQueries"  column="expand_queries"  />
         <result property="createBy"      column="create_by"      />
         <result property="createTime"    column="create_time"    />
         <result property="updateBy"      column="update_by"      />
@@ -20,6 +22,7 @@ PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
 
     <sql id="selectNewsKeywordVo">
         select id, text, category, is_active, fetch_interval, last_fetch_time,
+               relevance_threshold, expand_queries,
                create_by, create_time, update_by, update_time, remark
         from news_keyword
     </sql>
@@ -57,6 +60,8 @@ PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
             <if test="category != null">category, </if>
             <if test="isActive != null">is_active, </if>
             <if test="fetchInterval != null">fetch_interval, </if>
+            <if test="relevanceThreshold != null">relevance_threshold, </if>
+            <if test="expandQueries != null">expand_queries, </if>
             <if test="remark != null">remark,</if>
             <if test="createBy != null">create_by,</if>
             create_time
@@ -65,6 +70,8 @@ PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
             <if test="category != null">#{category}, </if>
             <if test="isActive != null">#{isActive}, </if>
             <if test="fetchInterval != null">#{fetchInterval}, </if>
+            <if test="relevanceThreshold != null">#{relevanceThreshold}, </if>
+            <if test="expandQueries != null">#{expandQueries}, </if>
             <if test="remark != null">#{remark},</if>
             <if test="createBy != null">#{createBy},</if>
             sysdate()
@@ -78,6 +85,8 @@ PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
             <if test="category != null">category = #{category}, </if>
             <if test="isActive != null">is_active = #{isActive}, </if>
             <if test="fetchInterval != null">fetch_interval = #{fetchInterval}, </if>
+            <if test="relevanceThreshold != null">relevance_threshold = #{relevanceThreshold}, </if>
+            <if test="expandQueries != null">expand_queries = #{expandQueries}, </if>
             <if test="remark != null">remark = #{remark},</if>
             <if test="updateBy != null">update_by = #{updateBy},</if>
             update_time = sysdate()

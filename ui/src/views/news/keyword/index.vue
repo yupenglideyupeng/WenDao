@@ -39,6 +39,11 @@
         </template>
       </el-table-column>
       <el-table-column label="间隔(分钟)" align="center" prop="fetchInterval" width="100" />
+      <el-table-column label="相关性阈值" align="center" prop="relevanceThreshold" width="100">
+        <template #default="scope">
+          <span>{{ scope.row.relevanceThreshold ?? 40 }}</span>
+        </template>
+      </el-table-column>
       <el-table-column label="上次抓取" align="center" prop="lastFetchTime" width="180">
         <template #default="scope">
           <span>{{ scope.row.lastFetchTime || '未抓取' }}</span>
@@ -65,6 +70,10 @@
         </el-form-item>
         <el-form-item label="抓取间隔" prop="fetchInterval">
           <el-input-number v-model="form.fetchInterval" :min="5" :max="1440" placeholder="分钟" />
+        </el-form-item>
+        <el-form-item label="相关性阈值" prop="relevanceThreshold">
+          <el-input-number v-model="form.relevanceThreshold" :min="0" :max="100" placeholder="0-100" />
+          <span style="margin-left: 8px; color: #909399; font-size: 12px;">低于此值的文章自动下架</span>
         </el-form-item>
         <el-form-item label="状态" prop="isActive">
           <el-radio-group v-model="form.isActive">
@@ -137,7 +146,8 @@ function reset() {
     text: undefined,
     category: undefined,
     isActive: 1,
-    fetchInterval: 30
+    fetchInterval: 30,
+    relevanceThreshold: 40
   } as NewsKeyword
   proxy?.resetForm('keywordRef')
 }

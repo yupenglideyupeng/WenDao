@@ -9,6 +9,7 @@ export interface NewsArticleQueryParams extends PageDomain {
   isPushed?: string
   typeConfigId?: number
   status?: string
+  fetchOrigin?: string
   beginTime?: string
   endTime?: string
 }
@@ -34,4 +35,10 @@ export interface NewsArticle extends BaseEntity {
   status?: string
   typeConfigId?: number
   typeName?: string
+  fetchOrigin?: string
+  relevance?: number
+  isReal?: number
+  importance?: string
+  relevanceReason?: string
+  keywordId?: number
 }

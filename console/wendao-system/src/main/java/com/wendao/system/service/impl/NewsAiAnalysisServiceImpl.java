@@ -51,29 +51,36 @@ public class NewsAiAnalysisServiceImpl implements INewsAiAnalysisService
 
     /** 兜底基础提示词（DB未配置时使用） */
     private static final String FALLBACK_BASIC_PROMPT =
-        "你是一个专业的新闻分析助手。分析新闻并返回JSON：\n" +
+        "你是一个专业的新闻分析助手。分析新闻并严格返回JSON，不要包含任何额外文字、解释或markdown格式：\n" +
         "{\"summary\":\"摘要\",\"tags\":[\"标签\"],\"sentiment\":\"positive|negative|neutral\",\"keywords\":\"关键词\"}";
 
     /** 兜底深度提示词 */
     private static final String FALLBACK_DEEP_PROMPT =
-        "你是一个热点内容分析专家。深度分析新闻并返回JSON：\n" +
+        "你是一个热点内容分析专家。深度分析新闻并严格返回JSON，不要包含任何额外文字、解释或markdown格式：\n" +
         "{\"isReal\":true/false,\"relevance\":0-100,\"relevanceReason\":\"理由\",\"keywordMentioned\":true/false,\"importance\":\"low|medium|high|urgent\",\"summary\":\"摘要\",\"tags\":[],\"sentiment\":\"positive|negative|neutral\",\"keywords\":\"关键词\"}";
 
     @Async("aiAnalysisExecutor")
     @Override
     public void analyzeAsync(NewsArticle article)
     {
-        doAnalyze(article, null, "ANALYSIS");
+        doAnalyze(article, null, "ANALYSIS", 0);
     }
 
     @Async("aiAnalysisExecutor")
     @Override
     public void analyzeDeepAsync(NewsArticle article, String keyword)
     {
-        doAnalyze(article, keyword, "ANALYSIS");
+        doAnalyze(article, keyword, "ANALYSIS", 0);
     }
 
-    private void doAnalyze(NewsArticle article, String keyword, String promptType)
+    @Async("aiAnalysisExecutor")
+    @Override
+    public void analyzeDeepAsync(NewsArticle article, String keyword, int relevanceThreshold)
+    {
+        doAnalyze(article, keyword, "ANALYSIS", relevanceThreshold);
+    }
+
+    private void doAnalyze(NewsArticle article, String keyword, String promptType, int relevanceThreshold)
     {
         if (!properties.isEnabled() || StringUtils.isEmpty(properties.getApiKey()))
         {
@@ -94,7 +101,7 @@ public class NewsAiAnalysisServiceImpl implements INewsAiAnalysisService
             // 从DB查找匹配的提示词配置
             NewsPromptConfig promptCfg = findPromptConfig(article, promptType);
 
-            JSONObject requestBody = buildRequestBody(article, keyword, promptCfg, activeTypes);
+            JSONObject requestBody = buildRequestBody(article, keyword, promptCfg, activeTypes, relevanceThreshold);
 
             HttpHeaders headers = new HttpHeaders();
             headers.setContentType(MediaType.APPLICATION_JSON);
@@ -120,8 +127,8 @@ public class NewsAiAnalysisServiceImpl implements INewsAiAnalysisService
             }
 
             String aiContent = choices.getJSONObject(0).getJSONObject("message").getString("content");
-            boolean isDeep = "ANALYSIS".equals(promptType) && keyword != null;
-            parseAiResult(article, aiContent, isDeep);
+            boolean isDeep = ("ANALYSIS".equals(promptType) && keyword != null) || relevanceThreshold > 0;
+            parseAiResult(article, aiContent, isDeep, relevanceThreshold);
 
             newsArticleService.updateArticle(article);
             log.info("AI分析完成，文章 [{}] typeConfigId={} sentiment={}",
@@ -161,15 +168,18 @@ public class NewsAiAnalysisServiceImpl implements INewsAiAnalysisService
     /**
      * 构建DeepSeek API请求体
      */
-    private JSONObject buildRequestBody(NewsArticle article, String keyword, NewsPromptConfig promptCfg, List<NewsTypeConfig> activeTypes)
+    private JSONObject buildRequestBody(NewsArticle article, String keyword, NewsPromptConfig promptCfg, List<NewsTypeConfig> activeTypes, int relevanceThreshold)
     {
         JSONObject body = new JSONObject();
 
         // 模型统一使用后端配置
         String model = properties.getModel();
         double temperature = 0.3;
-        int maxTokens = 500;
-        String systemPrompt = keyword != null ? FALLBACK_DEEP_PROMPT : FALLBACK_BASIC_PROMPT;
+        // 关键词驱动 或 来源深度分析(relevanceThreshold>0) 使用深度提示词
+        boolean useDeep = keyword != null || relevanceThreshold > 0;
+        // 深度分析字段多，给400；基础分析300即可，token越少越不容易跑偏
+        int maxTokens = useDeep ? 400 : 300;
+        String systemPrompt = useDeep ? FALLBACK_DEEP_PROMPT : FALLBACK_BASIC_PROMPT;
 
         if (promptCfg != null)
         {
@@ -189,6 +199,10 @@ public class NewsAiAnalysisServiceImpl implements INewsAiAnalysisService
         body.put("temperature", temperature);
         body.put("max_tokens", maxTokens);
         body.put("stream", false);
+        // 强制模型返回JSON格式，避免生成markdown或其他非JSON文本
+        JSONObject responseFormat = new JSONObject();
+        responseFormat.put("type", "json_object");
+        body.put("response_format", responseFormat);
 
         JSONArray messages = new JSONArray();
         JSONObject sysMsg = new JSONObject();
@@ -224,6 +238,7 @@ public class NewsAiAnalysisServiceImpl implements INewsAiAnalysisService
         return "【新闻类型分类】请根据文章内容判断它属于以下哪个类型，并在返回的JSON中增加 \"typeCode\" 字段（从下列code中选择最匹配的一个）。"
                 + "如果无法判断，请选择最接近的类型。\n"
                 + "可用类型：" + typeList + "\n"
+                + "重要：只返回JSON对象，不要包含任何额外文字、解释或markdown格式。\n"
                 + "示例返回：{\"typeCode\":\"ai_tech\",\"summary\":\"...\",\"tags\":[...],\"sentiment\":\"neutral\",\"keywords\":\"...\"}";
     }
 
@@ -249,12 +264,14 @@ public class NewsAiAnalysisServiceImpl implements INewsAiAnalysisService
     /**
      * 解析AI返回的JSON结果，填充到文章实体中
      */
-    private void parseAiResult(NewsArticle article, String aiContent, boolean deep)
+    private void parseAiResult(NewsArticle article, String aiContent, boolean deep, int relevanceThreshold)
     {
-        String jsonStr = aiContent.trim();
-        if (jsonStr.startsWith("```"))
+        String jsonStr = extractJson(aiContent);
+        if (jsonStr == null)
         {
-            jsonStr = jsonStr.replaceAll("```json\\s*", "").replaceAll("```\\s*", "").trim();
+            log.warn("无法从AI返回内容中提取JSON，文章: {}，原始内容前200字: {}",
+                    article.getTitle(), aiContent.substring(0, Math.min(aiContent.length(), 200)));
+            return;
         }
         try
         {
@@ -299,11 +316,114 @@ public class NewsAiAnalysisServiceImpl implements INewsAiAnalysisService
                     article.setKeywordMentioned(Boolean.TRUE.equals(result.getBoolean("keywordMentioned")) ? 1 : 0);
                 String imp = result.getString("importance");
                 if (imp != null && imp.matches("low|medium|high|urgent")) article.setImportance(imp);
+
+                // 相关性阈值过滤：低于阈值的文章自动下架
+                if (relevanceThreshold > 0 && article.getRelevance() != null
+                        && article.getRelevance() < relevanceThreshold)
+                {
+                    article.setStatus("1");
+                    log.info("文章 [{}] 相关性评分 {} 低于阈值 {}，自动下架",
+                            article.getTitle(), article.getRelevance(), relevanceThreshold);
+                }
             }
         }
         catch (Exception e)
         {
             log.warn("解析AI返回结果失败，原始内容: {}", aiContent, e);
         }
+    }
+
+    /**
+     * 从AI返回内容中提取JSON字符串
+     * 支持：纯JSON、```json```代码块包裹、混合文本中嵌入的JSON对象
+     * 使用大括号匹配确保提取完整的JSON对象
+     */
+    private String extractJson(String content)
+    {
+        if (StringUtils.isEmpty(content))
+        {
+            return null;
+        }
+        String trimmed = content.trim();
+
+        // 情况1：以{开头，尝试直接解析
+        if (trimmed.startsWith("{"))
+        {
+            try
+            {
+                JSON.parseObject(trimmed);
+                return trimmed;
+            }
+            catch (Exception ignored)
+            {
+                // 可能末尾有多余内容，走大括号匹配
+            }
+        }
+
+        // 情况2：```json ... ``` 代码块
+        if (trimmed.contains("```"))
+        {
+            String stripped = trimmed.replaceAll("```json\\s*", "").replaceAll("```\\s*", "").trim();
+            if (stripped.startsWith("{"))
+            {
+                try
+                {
+                    JSON.parseObject(stripped);
+                    return stripped;
+                }
+                catch (Exception ignored) {}
+            }
+        }
+
+        // 情况3：在混合内容中查找第一个完整的 {...} 块（大括号匹配）
+        int start = trimmed.indexOf('{');
+        if (start >= 0)
+        {
+            int depth = 0;
+            boolean inString = false;
+            boolean escaped = false;
+            for (int i = start; i < trimmed.length(); i++)
+            {
+                char c = trimmed.charAt(i);
+                if (escaped)
+                {
+                    escaped = false;
+                    continue;
+                }
+                if (c == '\\' && inString)
+                {
+                    escaped = true;
+                    continue;
+                }
+                if (c == '"')
+                {
+                    inString = !inString;
+                    continue;
+                }
+                if (!inString)
+                {
+                    if (c == '{') depth++;
+                    else if (c == '}')
+                    {
+                        depth--;
+                        if (depth == 0)
+                        {
+                            String candidate = trimmed.substring(start, i + 1);
+                            try
+                            {
+                                JSON.parseObject(candidate);
+                                return candidate;
+                            }
+                            catch (Exception ignored)
+                            {
+                                break;
+                            }
+                        }
+                    }
+                }
+            }
+        }
+
+        return null;
     }
 }

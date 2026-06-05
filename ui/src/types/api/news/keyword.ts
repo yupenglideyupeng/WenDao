@@ -15,4 +15,6 @@ export interface NewsKeyword extends BaseEntity {
   isActive?: number
   fetchInterval?: number
   lastFetchTime?: string
+  relevanceThreshold?: number
+  expandQueries?: string
 }

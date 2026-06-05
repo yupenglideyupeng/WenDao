@@ -39,6 +39,15 @@ public class NewsSource extends BaseEntity
     /** 状态：0=启用 1=停用 */
     private String status;
 
+    /** 优先级: high/medium/low */
+    private String priority;
+
+    /** 每次抓取最大文章数 */
+    private Integer maxArticlesPerFetch;
+
+    /** 抓取模式：PRIMARY=主力/SUPPLEMENTARY=辅助 */
+    private String fetchMode;
+
     public Long getId()
     {
         return id;
@@ -122,6 +131,15 @@ public class NewsSource extends BaseEntity
     {
         this.status = status;
     }
+
+    public String getPriority() { return priority; }
+    public void setPriority(String priority) { this.priority = priority; }
+
+    public Integer getMaxArticlesPerFetch() { return maxArticlesPerFetch; }
+    public void setMaxArticlesPerFetch(Integer maxArticlesPerFetch) { this.maxArticlesPerFetch = maxArticlesPerFetch; }
+
+    public String getFetchMode() { return fetchMode; }
+    public void setFetchMode(String fetchMode) { this.fetchMode = fetchMode; }
 
     @Override
     public String toString() {

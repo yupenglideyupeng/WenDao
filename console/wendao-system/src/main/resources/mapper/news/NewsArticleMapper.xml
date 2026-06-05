@@ -30,6 +30,7 @@ PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
         <result property="importance"   column="importance"     />
         <result property="typeConfigId" column="type_config_id" />
         <result property="typeName"    column="type_name"    />
+        <result property="fetchOrigin"  column="fetch_origin"  />
         <result property="createBy"     column="create_by"     />
         <result property="createTime"   column="create_time"   />
         <result property="updateBy"     column="update_by"     />
@@ -44,6 +45,7 @@ PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
                a.status, a.keyword_id, a.is_real, a.relevance, a.relevance_reason,
                a.keyword_mentioned, a.importance, a.type_config_id,
                tc.type_name,
+               a.fetch_origin,
                a.create_by, a.create_time, a.update_by, a.update_time, a.remark
         from news_article a
         left join news_source s on a.source_id = s.id
@@ -78,6 +80,9 @@ PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
             </if>
             <if test="status != null and status != ''">
                 AND a.status = #{status}
+            </if>
+            <if test="fetchOrigin != null and fetchOrigin != ''">
+                AND a.fetch_origin = #{fetchOrigin}
             </if>
             <if test="params.beginTime != null and params.beginTime != ''">
                 AND a.publish_time &gt;= #{params.beginTime}
@@ -164,6 +169,7 @@ PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
             <if test="keywordMentioned != null">keyword_mentioned, </if>
             <if test="importance != null">importance, </if>
             <if test="typeConfigId != null">type_config_id, </if>
+            <if test="fetchOrigin != null">fetch_origin, </if>
             <if test="createBy != null">create_by,</if>
             create_time
         )values(
@@ -187,6 +193,7 @@ PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
             <if test="keywordMentioned != null">#{keywordMentioned}, </if>
             <if test="importance != null">#{importance}, </if>
             <if test="typeConfigId != null">#{typeConfigId}, </if>
+            <if test="fetchOrigin != null">#{fetchOrigin}, </if>
             <if test="createBy != null">#{createBy},</if>
             sysdate()
         )
@@ -208,6 +215,7 @@ PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
             <if test="keywordMentioned != null">keyword_mentioned = #{keywordMentioned}, </if>
             <if test="importance != null">importance = #{importance}, </if>
             <if test="typeConfigId != null">type_config_id = #{typeConfigId}, </if>
+            <if test="fetchOrigin != null">fetch_origin = #{fetchOrigin}, </if>
             <if test="updateBy != null">update_by = #{updateBy},</if>
             update_time = sysdate()
         </set>

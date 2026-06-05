@@ -26,6 +26,11 @@ public interface NewsSourceMapper
     public List<NewsSource> selectEnabledSources();
 
     /**
+     * 查询所有PRIMARY模式且启用的新闻来源
+     */
+    public List<NewsSource> selectPrimarySources();
+
+    /**
      * 新增新闻来源
      */
     public int insertSource(NewsSource source);

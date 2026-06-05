@@ -32,6 +32,12 @@ public class NewsKeyword extends BaseEntity
     @JsonFormat(pattern = "yyyy-MM-dd HH:mm:ss")
     private Date lastFetchTime;
 
+    /** 相关性阈值,低于此值自动下架 */
+    private Integer relevanceThreshold;
+
+    /** 扩展查询词列表(JSON) */
+    private String expandQueries;
+
     public Long getId() { return id; }
     public void setId(Long id) { this.id = id; }
 
@@ -49,6 +55,12 @@ public class NewsKeyword extends BaseEntity
 
     public Date getLastFetchTime() { return lastFetchTime; }
     public void setLastFetchTime(Date lastFetchTime) { this.lastFetchTime = lastFetchTime; }
+
+    public Integer getRelevanceThreshold() { return relevanceThreshold; }
+    public void setRelevanceThreshold(Integer relevanceThreshold) { this.relevanceThreshold = relevanceThreshold; }
+
+    public String getExpandQueries() { return expandQueries; }
+    public void setExpandQueries(String expandQueries) { this.expandQueries = expandQueries; }
 
     @Override
     public String toString() {

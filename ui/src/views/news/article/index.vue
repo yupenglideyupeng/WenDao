@@ -28,6 +28,12 @@
           <el-option label="未推送" value="0" />
         </el-select>
       </el-form-item>
+      <el-form-item label="来源方式" prop="fetchOrigin">
+        <el-select v-model="queryParams.fetchOrigin" placeholder="请选择" clearable>
+          <el-option label="关键词" value="KEYWORD" />
+          <el-option label="来源" value="SOURCE" />
+        </el-select>
+      </el-form-item>
       <el-form-item>
         <el-button type="primary" icon="Search" @click="handleQuery">搜索</el-button>
         <el-button icon="Refresh" @click="resetQuery">重置</el-button>
@@ -52,6 +58,22 @@
         </template>
       </el-table-column>
       <el-table-column label="来源" align="center" prop="sourceName" width="120" />
+      <el-table-column label="来源方式" align="center" prop="fetchOrigin" width="90">
+        <template #default="scope">
+          <el-tag :type="scope.row.fetchOrigin === 'KEYWORD' ? '' : 'info'" size="small">
+            {{ scope.row.fetchOrigin === 'KEYWORD' ? '关键词' : '来源' }}
+          </el-tag>
+        </template>
+      </el-table-column>
+      <el-table-column label="相关性" align="center" prop="relevance" width="90">
+        <template #default="scope">
+          <span v-if="scope.row.relevance != null && scope.row.relevance > 0"
+                :style="{ color: scope.row.relevance >= 70 ? '#67C23A' : scope.row.relevance >= 40 ? '#E6A23C' : '#F56C6C' }">
+            {{ scope.row.relevance }}
+          </span>
+          <span v-else style="color:#C0C4CC">-</span>
+        </template>
+      </el-table-column>
       <el-table-column label="类型" align="center" prop="typeName" width="100">
         <template #default="scope">
           <el-tag size="small" v-if="scope.row.typeName">{{ scope.row.typeName }}</el-tag>
@@ -97,6 +119,11 @@
         <el-descriptions :column="2" border>
           <el-descriptions-item label="标题" :span="2">{{ detail.title }}</el-descriptions-item>
           <el-descriptions-item label="来源">{{ detail.sourceName }}</el-descriptions-item>
+          <el-descriptions-item label="来源方式">
+            <el-tag :type="detail.fetchOrigin === 'KEYWORD' ? '' : 'info'" size="small">
+              {{ detail.fetchOrigin === 'KEYWORD' ? '关键词' : '来源' }}
+            </el-tag>
+          </el-descriptions-item>
           <el-descriptions-item label="新闻类型">
             <el-tag size="small" v-if="detail.typeName">{{ detail.typeName }}</el-tag>
             <span v-else style="color:#909399">未分类</span>
@@ -104,6 +131,13 @@
           <el-descriptions-item label="语言">{{ detail.language === 'zh' ? '中文' : detail.language === 'en' ? '英文' : detail.language }}</el-descriptions-item>
           <el-descriptions-item label="情感">
             <el-tag :type="sentimentType(detail.sentiment)" size="small" v-if="detail.sentiment">{{ sentimentLabel(detail.sentiment) }}</el-tag>
+          </el-descriptions-item>
+          <el-descriptions-item label="相关性">
+            <span v-if="detail.relevance != null && detail.relevance > 0"
+                  :style="{ color: detail.relevance >= 70 ? '#67C23A' : detail.relevance >= 40 ? '#E6A23C' : '#F56C6C', fontWeight: 'bold' }">
+              {{ detail.relevance }}分
+            </span>
+            <span v-else style="color:#C0C4CC">未评分</span>
           </el-descriptions-item>
           <el-descriptions-item label="推送状态">{{ detail.isPushed === '1' ? '已推送' : '未推送' }}</el-descriptions-item>
           <el-descriptions-item label="标签" :span="2">

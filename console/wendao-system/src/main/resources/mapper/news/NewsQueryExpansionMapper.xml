@@ -1,0 +1,35 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper
+PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+"http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.wendao.system.mapper.NewsQueryExpansionMapper">
+
+    <resultMap type="NewsQueryExpansion" id="QueryExpansionResult">
+        <result property="id"            column="id"             />
+        <result property="keywordId"     column="keyword_id"     />
+        <result property="expandedTerm"  column="expanded_term"  />
+        <result property="expansionType" column="expansion_type" />
+        <result property="isActive"      column="is_active"      />
+        <result property="createTime"    column="create_time"    />
+    </resultMap>
+
+    <select id="selectByKeywordId" parameterType="Long" resultMap="QueryExpansionResult">
+        select id, keyword_id, expanded_term, expansion_type, is_active, create_time
+        from news_query_expansion
+        where keyword_id = #{keywordId} and is_active = 1
+        order by id asc
+    </select>
+
+    <insert id="insertExpansion" parameterType="NewsQueryExpansion" useGeneratedKeys="true" keyProperty="id">
+        insert into news_query_expansion (
+            keyword_id, expanded_term, expansion_type, is_active, create_time
+        ) values (
+            #{keywordId}, #{expandedTerm}, #{expansionType}, #{isActive}, sysdate()
+        )
+    </insert>
+
+    <delete id="deleteByKeywordId" parameterType="Long">
+        delete from news_query_expansion where keyword_id = #{keywordId}
+    </delete>
+
+</mapper>

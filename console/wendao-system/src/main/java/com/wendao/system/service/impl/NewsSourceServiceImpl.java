@@ -37,6 +37,12 @@ public class NewsSourceServiceImpl implements INewsSourceService
     }
 
     @Override
+    public List<NewsSource> selectPrimarySources()
+    {
+        return sourceMapper.selectPrimarySources();
+    }
+
+    @Override
     public int insertSource(NewsSource source)
     {
         return sourceMapper.insertSource(source);

@@ -14,6 +14,12 @@
           <el-option v-for="dict in sys_normal_disable" :key="dict.value" :label="dict.label" :value="dict.value" />
         </el-select>
       </el-form-item>
+      <el-form-item label="抓取模式" prop="fetchMode">
+        <el-select v-model="queryParams.fetchMode" placeholder="请选择模式" clearable>
+          <el-option label="主力" value="PRIMARY" />
+          <el-option label="辅助" value="SUPPLEMENTARY" />
+        </el-select>
+      </el-form-item>
       <el-form-item>
         <el-button type="primary" icon="Search" @click="handleQuery">搜索</el-button>
         <el-button icon="Refresh" @click="resetQuery">重置</el-button>
@@ -44,6 +50,21 @@
       </el-table-column>
       <el-table-column label="抓取方式" align="center" prop="fetchType" width="100" />
       <el-table-column label="间隔(分钟)" align="center" prop="fetchInterval" width="100" />
+      <el-table-column label="优先级" align="center" prop="priority" width="90">
+        <template #default="scope">
+          <el-tag :type="scope.row.priority === 'high' ? 'danger' : scope.row.priority === 'medium' ? 'warning' : 'info'" size="small">
+            {{ scope.row.priority === 'high' ? '高' : scope.row.priority === 'medium' ? '中' : '低' }}
+          </el-tag>
+        </template>
+      </el-table-column>
+      <el-table-column label="配额" align="center" prop="maxArticlesPerFetch" width="70" />
+      <el-table-column label="抓取模式" align="center" prop="fetchMode" width="90">
+        <template #default="scope">
+          <el-tag :type="scope.row.fetchMode === 'PRIMARY' ? 'success' : 'info'" size="small">
+            {{ scope.row.fetchMode === 'PRIMARY' ? '主力' : '辅助' }}
+          </el-tag>
+        </template>
+      </el-table-column>
       <el-table-column label="状态" align="center" prop="status" width="100">
         <template #default="scope">
           <dict-tag :options="sys_normal_disable" :value="scope.row.status" />
@@ -83,6 +104,22 @@
         </el-form-item>
         <el-form-item label="抓取间隔" prop="fetchInterval">
           <el-input-number v-model="form.fetchInterval" :min="1" :max="1440" placeholder="分钟" />
+        </el-form-item>
+        <el-form-item label="抓取模式" prop="fetchMode">
+          <el-radio-group v-model="form.fetchMode">
+            <el-radio value="PRIMARY">主力</el-radio>
+            <el-radio value="SUPPLEMENTARY">辅助</el-radio>
+          </el-radio-group>
+        </el-form-item>
+        <el-form-item label="优先级" prop="priority">
+          <el-select v-model="form.priority" placeholder="请选择优先级">
+            <el-option label="高" value="high" />
+            <el-option label="中" value="medium" />
+            <el-option label="低" value="low" />
+          </el-select>
+        </el-form-item>
+        <el-form-item label="配额" prop="maxArticlesPerFetch">
+          <el-input-number v-model="form.maxArticlesPerFetch" :min="1" :max="50" placeholder="每次最大抓取数" />
         </el-form-item>
         <el-form-item label="状态" prop="status">
           <el-radio-group v-model="form.status">
@@ -167,6 +204,9 @@ function reset() {
     url: undefined,
     fetchType: 'RSS',
     fetchInterval: 30,
+    priority: 'medium',
+    maxArticlesPerFetch: 10,
+    fetchMode: 'PRIMARY',
     status: '0'
   } as NewsSource
   proxy?.resetForm('sourceRef')

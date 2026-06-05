@@ -5,6 +5,7 @@ export interface NewsSourceQueryParams extends PageDomain {
   name?: string
   type?: string
   status?: string
+  fetchMode?: string
 }
 
 /** 新闻来源 */
@@ -17,4 +18,7 @@ export interface NewsSource extends BaseEntity {
   fetchInterval?: number
   fetchConfig?: string
   status?: string
+  priority?: string
+  maxArticlesPerFetch?: number
+  fetchMode?: string
 }

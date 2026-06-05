@@ -14,7 +14,7 @@ import org.springframework.scheduling.concurrent.ThreadPoolTaskExecutor;
  */
 @Configuration
 @EnableAsync
-@EnableConfigurationProperties(NewsAiProperties.class)
+@EnableConfigurationProperties({NewsAiProperties.class, NewsFetchProperties.class})
 public class NewsAiConfig
 {
     /**
