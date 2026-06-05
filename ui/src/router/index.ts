@@ -64,7 +64,7 @@ export const constantRoutes = [
     children: [
       {
         path: '/index',
-        component: () => import('@/views/index.vue'),
+        component: () => import('@/views/news/dashboard/index.vue'),
         name: 'Index',
         meta: { title: '首页', icon: 'dashboard', affix: true }
       }
@@ -168,16 +168,10 @@ export const dynamicRoutes = [
   {
     path: '/news',
     component: Layout,
-    redirect: '/news/dashboard',
+    redirect: '/news/article',
     name: 'News',
     meta: { title: 'AI新闻', icon: 'monitor' },
     children: [
-      {
-        path: 'dashboard',
-        component: () => import('@/views/news/dashboard/index.vue'),
-        name: 'NewsDashboard',
-        meta: { title: '新闻大屏', icon: 'dashboard' }
-      },
       {
         path: 'source',
         component: () => import('@/views/news/source/index.vue'),

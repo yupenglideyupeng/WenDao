@@ -11,16 +11,13 @@
     <div class="right-menu">
       <template v-if="appStore.device !== 'mobile'">
         <header-search id="header-search" class="right-menu-item" />
-
-        <el-tooltip content="源码地址" effect="dark" placement="bottom">
-          <wen-dao-git id="wendao-git" class="right-menu-item hover-effect" />
-        </el-tooltip>
-
-        <el-tooltip content="文档地址" effect="dark" placement="bottom">
-          <wen-dao-doc id="wendao-doc" class="right-menu-item hover-effect" />
-        </el-tooltip>
-
         <screenfull id="screenfull" class="right-menu-item hover-effect" />
+
+        <el-tooltip content="数据大屏" effect="dark" placement="bottom">
+          <div class="right-menu-item hover-effect" @click="openScreen">
+            <svg-icon icon-class="monitor" />
+          </div>
+        </el-tooltip>
 
         <el-tooltip content="主题模式" effect="dark" placement="bottom">
           <div class="right-menu-item hover-effect theme-switch-wrapper" @click="toggleTheme">
@@ -91,6 +88,10 @@ const settingsStore = useSettingsStore()
 
 function toggleSideBar(): void {
   appStore.toggleSideBar()
+}
+
+function openScreen(): void {
+  window.open('/screen/dashboard', '_blank')
 }
 
 function handleCommand(command: string): void {

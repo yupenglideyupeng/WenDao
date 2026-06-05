@@ -10,6 +10,7 @@ import org.springframework.web.bind.annotation.RestController;
 import com.wendao.common.annotation.Log;
 import com.wendao.common.core.controller.BaseController;
 import com.wendao.common.core.domain.AjaxResult;
+import com.wendao.common.core.page.TableDataInfo;
 import com.wendao.common.enums.BusinessType;
 import com.wendao.framework.websocket.NewsWebSocketHandler;
 import com.wendao.system.domain.NewsArticle;
@@ -66,5 +67,18 @@ public class NewsDashboardController extends BaseController
     {
         int count = webSocketHandler.getOnlineCount();
         return success(Map.of("onlineCount", count));
+    }
+
+    /**
+     * 大屏新闻分页查询（支持筛选条件，用于无限滚动加载）
+     */
+    @Log(title = "新闻大屏", businessType = BusinessType.OTHER, isSaveResponseData = false)
+    @GetMapping("/feed")
+    public TableDataInfo getArticleFeed(NewsArticle article)
+    {
+        article.setStatus("0");
+        startPage();
+        List<NewsArticle> list = newsArticleService.selectArticleList(article);
+        return getDataTable(list);
     }
 }
