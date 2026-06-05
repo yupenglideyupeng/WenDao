@@ -64,6 +64,13 @@
                     {{ sentimentLabel(article.sentiment) }}
                   </el-tag>
                   <span class="feed-source">{{ article.sourceName }}</span>
+                  <el-button
+                    size="small"
+                    type="warning"
+                    text
+                    class="feed-interpret-btn"
+                    @click="handleInterpret(article)"
+                  >🤖 解读</el-button>
                 </div>
                 <div class="feed-title">
                   <a :href="article.originalUrl" target="_blank">{{ article.title }}</a>
@@ -105,15 +112,22 @@
       </el-col>
     </el-row>
   </div>
+
+  <!-- 一键解读对话框 -->
+  <NewsInterpretDialog
+    v-model="interpretOpen"
+    :article-id="interpretArticleId"
+    :article-title="interpretArticleTitle"
+  />
 </template>
 
 <script setup lang="ts" name="NewsDashboard">
-import { ref, reactive, onMounted, onUnmounted, nextTick, computed } from 'vue'
 import * as echarts from 'echarts'
 import { getToken } from '@/utils/auth'
 import { getDashboardStats, getLatestArticles, getOnlineCount } from '@/api/news/dashboard'
 import type { DashboardStats } from '@/types/api/news/dashboard'
 import type { NewsArticle } from '@/types/api/news/article'
+import NewsInterpretDialog from '@/views/news/article/NewsInterpretDialog.vue'
 
 const currentTime = ref('')
 let timeTimer: number
@@ -127,6 +141,17 @@ const stats = ref<DashboardStats>({})
 const feedArticles = ref<NewsArticle[]>([])
 const feedContainerRef = ref<HTMLDivElement>()
 const MAX_FEED = 100
+
+// 解读对话框状态
+const interpretOpen = ref(false)
+const interpretArticleId = ref<number | null>(null)
+const interpretArticleTitle = ref('')
+
+function handleInterpret(article: NewsArticle) {
+  interpretArticleId.value = article.id!
+  interpretArticleTitle.value = article.title || ''
+  interpretOpen.value = true
+}
 
 // WebSocket
 let ws: WebSocket | null = null
@@ -415,6 +440,17 @@ onUnmounted(() => {
 .feed-source {
   color: #909399;
   font-size: 12px;
+}
+
+.feed-interpret-btn {
+  margin-left: auto;
+  font-size: 12px;
+  padding: 0 4px;
+  height: 20px;
+  color: #e6a23c !important;
+}
+.feed-interpret-btn:hover {
+  color: #f39c12 !important;
 }
 
 .feed-title a {

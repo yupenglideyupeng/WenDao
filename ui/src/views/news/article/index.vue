@@ -80,9 +80,10 @@
         </template>
       </el-table-column>
       <el-table-column label="发布时间" align="center" prop="publishTime" width="180" />
-      <el-table-column label="操作" align="center" class-name="small-padding fixed-width" width="180">
+      <el-table-column label="操作" align="center" class-name="small-padding fixed-width" width="230">
         <template #default="scope">
           <el-button link type="primary" icon="View" @click="handleDetail(scope.row)">详情</el-button>
+          <el-button link type="warning" icon="MagicStick" @click="handleInterpret(scope.row)">解读</el-button>
           <el-button link type="primary" icon="Delete" @click="handleDelete(scope.row)" v-hasPermi="['news:article:remove']">删除</el-button>
         </template>
       </el-table-column>
@@ -117,6 +118,13 @@
         </el-descriptions>
       </div>
     </el-dialog>
+
+    <!-- 一键解读对话框 -->
+    <NewsInterpretDialog
+      v-model="interpretOpen"
+      :article-id="interpretArticleId"
+      :article-title="interpretArticleTitle"
+    />
   </div>
 </template>
 
@@ -125,6 +133,7 @@ import { listArticle, getArticle, delArticle } from '@/api/news/article'
 import { listType } from '@/api/news/typeConfig'
 import type { NewsArticle, NewsArticleQueryParams } from '@/types/api/news/article'
 import type { NewsTypeConfig } from '@/types/api/news/typeConfig'
+import NewsInterpretDialog from './NewsInterpretDialog.vue'
 
 const { proxy } = getCurrentInstance()
 
@@ -139,6 +148,11 @@ const detailOpen = ref(false)
 const detailTitle = ref('')
 const detail = ref<NewsArticle>()
 const typeOptions = ref<NewsTypeConfig[]>([])
+
+// 解读对话框状态
+const interpretOpen = ref(false)
+const interpretArticleId = ref<number | null>(null)
+const interpretArticleTitle = ref('')
 
 const data = reactive({
   queryParams: {
@@ -192,6 +206,12 @@ function handleDetail(row: NewsArticle) {
     detailOpen.value = true
     detailTitle.value = '文章详情'
   })
+}
+
+function handleInterpret(row: NewsArticle) {
+  interpretArticleId.value = row.id!
+  interpretArticleTitle.value = row.title || ''
+  interpretOpen.value = true
 }
 
 function handleDelete(row?: NewsArticle) {
