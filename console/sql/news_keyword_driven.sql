@@ -17,6 +17,10 @@ ALTER TABLE news_keyword
 ALTER TABLE news_article
   ADD COLUMN fetch_origin VARCHAR(20) DEFAULT 'SOURCE' COMMENT '来源方式: KEYWORD/SOURCE';
 
+-- 1.3.1 允许 source_id 为 NULL（关键词搜索文章无固定来源）
+ALTER TABLE news_article
+  MODIFY COLUMN source_id BIGINT(20) DEFAULT NULL COMMENT '新闻来源ID（关键词搜索时为NULL）';
+
 -- 1.4 回填历史数据
 UPDATE news_article SET fetch_origin = 'KEYWORD' WHERE keyword_id IS NOT NULL;
 

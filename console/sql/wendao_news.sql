@@ -43,7 +43,7 @@ DROP TABLE IF EXISTS `news_article`;
 CREATE TABLE `news_article`
 (
     `id`              BIGINT(20)   NOT NULL AUTO_INCREMENT COMMENT '主键ID',
-    `source_id`       BIGINT(20)   NOT NULL COMMENT '新闻来源ID',
+    `source_id`       BIGINT(20)            DEFAULT NULL COMMENT '新闻来源ID（关键词搜索时为NULL）',
     `source_name`     VARCHAR(100)          DEFAULT NULL COMMENT '来源名称（冗余，方便查询）',
     `title`           VARCHAR(500) NOT NULL COMMENT '文章标题',
     `summary`         TEXT                  DEFAULT NULL COMMENT 'AI 生成的摘要',
