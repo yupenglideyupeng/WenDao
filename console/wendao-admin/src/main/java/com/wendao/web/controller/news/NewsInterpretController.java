@@ -144,12 +144,11 @@ public class NewsInterpretController extends BaseController
                 return;
             }
 
-            // 2. 防止重复提交：如果上一条记录仍在进行中，拒绝本次请求
+            // 2. 如果上一条记录仍在进行中，标记为已取消（前端重新解读时断开连接导致）
             NewsInterpretation latest = interpretationService.selectLatestByArticleId(articleId);
             if (latest != null && "0".equals(latest.getStatus()))
             {
-                writeError(outputStream, "该文章正在解读中，请稍后再试");
-                return;
+                markFailed(latest, "用户重新发起解读，本次已取消");
             }
 
             // 3. 查找匹配的提示词配置
