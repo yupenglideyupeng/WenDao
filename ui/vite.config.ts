@@ -1,8 +1,26 @@
-import { defineConfig, loadEnv } from 'vite'
+import { defineConfig, loadEnv, Plugin } from 'vite'
 import path from 'path'
 import createVitePlugins from './vite/plugins'
 
 const baseUrl = 'http://localhost:8080' // 后端接口
+
+/**
+ * Vite 插件：大屏 SPA 路由支持
+ * 开发模式下，将 /screen/* 请求重写到 screen.html，确保客户端路由正常工作
+ */
+function screenSpaPlugin(): Plugin {
+  return {
+    name: 'screen-spa',
+    configureServer(server) {
+      server.middlewares.use((req, _res, next) => {
+        if (req.url && req.url.startsWith('/screen/') && !req.url.endsWith('.html')) {
+          req.url = '/screen.html'
+        }
+        next()
+      })
+    }
+  }
+}
 
 // https://vitejs.dev/config/
 export default defineConfig(({ mode, command }) => {
@@ -13,7 +31,7 @@ export default defineConfig(({ mode, command }) => {
     // 默认情况下，vite 会假设你的应用是被部署在一个域名的根路径上
     // 例如 https://www.wendao.vip/。如果应用被部署在一个子路径上，你就需要用这个选项指定这个子路径。例如，如果你的应用被部署在 https://www.wendao.vip/admin/，则设置 baseUrl 为 /admin/。
     base: VITE_APP_ENV === 'production' ? '/' : '/',
-    plugins: createVitePlugins(env, command === 'build'),
+    plugins: [screenSpaPlugin(), ...createVitePlugins(env, command === 'build')],
     resolve: {
       // https://cn.vitejs.dev/config/#resolve-alias
       alias: {
@@ -33,10 +51,22 @@ export default defineConfig(({ mode, command }) => {
       assetsDir: 'assets',
       chunkSizeWarningLimit: 2000,
       rollupOptions: {
+        input: {
+          main: path.resolve(__dirname, 'index.html'),
+          screen: path.resolve(__dirname, 'screen.html')
+        },
         output: {
           chunkFileNames: 'static/js/[name]-[hash].js',
           entryFileNames: 'static/js/[name]-[hash].js',
-          assetFileNames: 'static/[ext]/[name]-[hash].[ext]'
+          assetFileNames: 'static/[ext]/[name]-[hash].[ext]',
+          manualChunks(id) {
+            if (id.includes('node_modules')) {
+              if (id.includes('echarts') || id.includes('zrender')) {
+                return 'vendor-echarts'
+              }
+              return 'vendor'
+            }
+          }
         }
       }
     },

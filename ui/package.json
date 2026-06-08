@@ -9,6 +9,7 @@
     "dev": "vite",
     "build:prod": "vite build",
     "build:stage": "vite build --mode staging",
+    "build:screen": "vite build screen.html",
     "preview": "vite preview"
   },
   "repository": {
@@ -17,6 +18,7 @@
   },
   "dependencies": {
     "@element-plus/icons-vue": "2.3.2",
+    "@types/markdown-it": "^14.1.2",
     "@vueup/vue-quill": "1.2.0",
     "@vueuse/core": "14.1.0",
     "axios": "1.13.2",
@@ -25,9 +27,13 @@
     "element-plus": "2.13.1",
     "file-saver": "2.0.5",
     "fuse.js": "7.1.0",
+    "html2canvas": "^1.4.1",
     "js-beautify": "1.15.4",
     "js-cookie": "3.0.5",
     "jsencrypt": "3.3.2",
+    "jspdf": "^4.2.1",
+    "markdown-it": "^14.2.0",
+    "mermaid": "^11.15.0",
     "nprogress": "0.2.0",
     "pinia": "3.0.4",
     "vue": "3.5.26",
