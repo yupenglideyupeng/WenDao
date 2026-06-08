@@ -239,6 +239,7 @@
       v-model="interpretOpen"
       :article-id="interpretArticleId"
       :article-title="interpretArticleTitle"
+      compact
     />
   </div>
 </template>
@@ -310,6 +311,11 @@ const interpretArticleTitle = ref('')
 let ws: WebSocket | null = null
 let reconnectTimer: number
 let searchDebounceTimer: number | null = null
+
+// 通知节流：合并短时间内的多条推送为一条通知
+const pendingNotifications: NewsArticle[] = []
+let notifyTimer: number | null = null
+const NOTIFY_BATCH_MS = 300
 
 // 图表
 const sourceChartRef = ref<HTMLDivElement>()
@@ -586,8 +592,8 @@ function connectWebSocket() {
           }
         }
         filterRealtime()
-        // 通知卡片
-        showArticleNotification(article)
+        // 通知节流：收集后批量展示
+        scheduleNotification(article)
         // 刷新统计（延迟，避免频繁请求）
         loadStats()
       }
@@ -608,7 +614,39 @@ function connectWebSocket() {
   }
 }
 
-// ========== 通知卡片 ==========
+// ========== 通知卡片（节流合并） ==========
+
+/**
+ * 节流通知：300ms 内的多条推送合并为一条通知
+ */
+function scheduleNotification(article: NewsArticle) {
+  pendingNotifications.push(article)
+  if (notifyTimer) clearTimeout(notifyTimer)
+  notifyTimer = window.setTimeout(() => {
+    flushNotifications()
+    notifyTimer = null
+  }, NOTIFY_BATCH_MS)
+}
+
+function flushNotifications() {
+  const count = pendingNotifications.length
+  if (count === 0) return
+  if (count === 1) {
+    showArticleNotification(pendingNotifications[0])
+  } else {
+    // 多条合并：显示摘要
+    ElNotification({
+      title: `收到 ${count} 条新新闻`,
+      message: h('div', { class: 'screen-notif-body' }, [
+        h('p', { class: 'notif-summary' }, pendingNotifications.slice(0, 3).map(a => truncateText(a.title || '', 30)).join('、') + (count > 3 ? '...' : ''))
+      ]),
+      position: 'top-right',
+      duration: 5000,
+      customClass: 'screen-notification'
+    })
+  }
+  pendingNotifications.length = 0
+}
 
 function showArticleNotification(article: NewsArticle) {
   const title = truncateText(article.title || '新新闻', 40)
@@ -754,6 +792,7 @@ onUnmounted(() => {
   clearInterval(timeTimer)
   clearTimeout(reconnectTimer)
   if (searchDebounceTimer) clearTimeout(searchDebounceTimer)
+  if (notifyTimer) clearTimeout(notifyTimer)
   ws?.close()
   sourceChart?.dispose()
   sentimentChart?.dispose()
@@ -1084,19 +1123,17 @@ onUnmounted(() => {
   margin-left: auto;
 }
 .card-interpret-btn {
-  background: none;
-  border: 1px solid rgba(230,162,60,0.25);
+  background: rgba(230,162,60,0.08);
+  border: 1px solid rgba(230,162,60,0.3);
   color: #e6a23c;
   font-size: 10px;
   padding: 1px 8px;
   border-radius: 3px;
   cursor: pointer;
-  opacity: 0;
   transition: all 0.2s;
   white-space: nowrap;
 }
-.feed-card:hover .card-interpret-btn { opacity: 1; }
-.card-interpret-btn:hover { background: rgba(230,162,60,0.1); border-color: #e6a23c; }
+.card-interpret-btn:hover { background: rgba(230,162,60,0.18); border-color: #e6a23c; }
 
 .card-title a {
   color: #d0d5dc;
