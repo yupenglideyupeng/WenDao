@@ -147,6 +147,16 @@ xss:
 news:
   # 抓取间隔(毫秒)，默认5分钟
   fetch-interval: 300000
+  # 查询扩展配置
+  query-expansion:
+    # 是否启用查询扩展（同义词/相关词）
+    enabled: true
+    # 每个关键词最多扩展几个词
+    max-terms: 3
+  # 相关性过滤配置
+  relevance:
+    # 全局默认相关性阈值（低于此值的文章自动下架）
+    default-threshold: 40
   # AI分析配置
   ai:
     # 是否启用AI分析
