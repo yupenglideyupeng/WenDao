@@ -1,3 +1,28 @@
+-- ============================================================
+-- WenDao（问道）- AI 新闻智能监控平台
+-- 数据库初始化脚本（合并版）
+--
+-- 数据库：ry-vue
+-- MySQL 版本要求：8.0+
+-- 执行方式：mysql -u root -p ry-vue < wendao.sql
+-- ============================================================
+-- 执行顺序说明：
+--   1. 若依核心表结构 + 初始数据
+--   2. Quartz 定时任务表
+--   3. AI 新闻核心表 + 种子数据
+--   4. AI 新闻菜单权限
+--   5. 关键词监控功能
+--   6. 关键词监控菜单
+--   7. 关键词驱动改造
+--   8. 提示词配置改造
+--   9. AI 解读功能
+--  10. AI 模型配置管理 + 字典
+-- ============================================================
+
+-- ============================================================
+-- 第一部分：若依核心表结构（原 ry_20260417.sql）
+-- ============================================================
+
 -- ----------------------------
 -- 1、部门表
 -- ----------------------------
@@ -20,9 +45,6 @@ create table sys_dept (
   primary key (dept_id)
 ) engine=innodb auto_increment=200 comment = '部门表';
 
--- ----------------------------
--- 初始化-部门表数据
--- ----------------------------
 insert into sys_dept values(100,  0,   '0',          '闻道科技',   0, '若依', '15888888888', 'admin@wendao.vip', '0', '0', 'admin', sysdate(), '', null);
 insert into sys_dept values(101,  100, '0,100',      '深圳总公司', 1, '若依', '15888888888', 'admin@wendao.vip', '0', '0', 'admin', sysdate(), '', null);
 insert into sys_dept values(102,  100, '0,100',      '长沙分公司', 2, '若依', '15888888888', 'admin@wendao.vip', '0', '0', 'admin', sysdate(), '', null);
@@ -63,9 +85,6 @@ create table sys_user (
   primary key (user_id)
 ) engine=innodb auto_increment=100 comment = '用户信息表';
 
--- ----------------------------
--- 初始化-用户信息表数据
--- ----------------------------
 insert into sys_user values(1,  103, 'admin', '若依', '00', 'admin@wendao.vip', '15888888888', '1', '', '$2a$10$7JB720yubVSZvUI0rEqK/.VqGOZTH.ulu33dHOiBE8ByOhJIrdAu2', '0', '0', '127.0.0.1', sysdate(), sysdate(), 'admin', sysdate(), '', null, '管理员');
 insert into sys_user values(2,  105, 'ry',    '若依', '00', 'admin@wendao.vip',  '15666666666', '1', '', '$2a$10$7JB720yubVSZvUI0rEqK/.VqGOZTH.ulu33dHOiBE8ByOhJIrdAu2', '0', '0', '127.0.0.1', sysdate(), sysdate(), 'admin', sysdate(), '', null, '测试员');
 
@@ -89,9 +108,6 @@ create table sys_post
   primary key (post_id)
 ) engine=innodb comment = '岗位信息表';
 
--- ----------------------------
--- 初始化-岗位信息表数据
--- ----------------------------
 insert into sys_post values(1, 'ceo',  '董事长',    1, '0', 'admin', sysdate(), '', null, '');
 insert into sys_post values(2, 'se',   '项目经理',  2, '0', 'admin', sysdate(), '', null, '');
 insert into sys_post values(3, 'hr',   '人力资源',  3, '0', 'admin', sysdate(), '', null, '');
@@ -120,9 +136,6 @@ create table sys_role (
   primary key (role_id)
 ) engine=innodb auto_increment=100 comment = '角色信息表';
 
--- ----------------------------
--- 初始化-角色信息表数据
--- ----------------------------
 insert into sys_role values('1', '超级管理员',  'admin',  1, 1, 1, 1, '0', '0', 'admin', sysdate(), '', null, '超级管理员');
 insert into sys_role values('2', '普通角色',    'common', 2, 2, 1, 1, '0', '0', 'admin', sysdate(), '', null, '普通角色');
 
@@ -155,9 +168,6 @@ create table sys_menu (
   primary key (menu_id)
 ) engine=innodb auto_increment=2000 comment = '菜单权限表';
 
--- ----------------------------
--- 初始化-菜单信息表数据
--- ----------------------------
 -- 一级菜单
 insert into sys_menu values('1', '系统管理', '0', '1', 'system',           null, '', '', 1, 0, 'M', '0', '0', '', 'system',   'admin', sysdate(), '', null, '系统管理目录');
 insert into sys_menu values('2', '系统监控', '0', '2', 'monitor',          null, '', '', 1, 0, 'M', '0', '0', '', 'monitor',  'admin', sysdate(), '', null, '系统监控目录');
@@ -262,7 +272,7 @@ insert into sys_menu values('1060', '生成代码', '116', '6', '#', '', '', '',
 
 
 -- ----------------------------
--- 6、用户和角色关联表  用户N-1角色
+-- 6、用户和角色关联表
 -- ----------------------------
 drop table if exists sys_user_role;
 create table sys_user_role (
@@ -271,15 +281,12 @@ create table sys_user_role (
   primary key(user_id, role_id)
 ) engine=innodb comment = '用户和角色关联表';
 
--- ----------------------------
--- 初始化-用户和角色关联表数据
--- ----------------------------
 insert into sys_user_role values ('1', '1');
 insert into sys_user_role values ('2', '2');
 
 
 -- ----------------------------
--- 7、角色和菜单关联表  角色1-N菜单
+-- 7、角色和菜单关联表
 -- ----------------------------
 drop table if exists sys_role_menu;
 create table sys_role_menu (
@@ -288,9 +295,6 @@ create table sys_role_menu (
   primary key(role_id, menu_id)
 ) engine=innodb comment = '角色和菜单关联表';
 
--- ----------------------------
--- 初始化-角色和菜单关联表数据
--- ----------------------------
 insert into sys_role_menu values ('2', '1');
 insert into sys_role_menu values ('2', '2');
 insert into sys_role_menu values ('2', '3');
@@ -377,8 +381,9 @@ insert into sys_role_menu values ('2', '1058');
 insert into sys_role_menu values ('2', '1059');
 insert into sys_role_menu values ('2', '1060');
 
+
 -- ----------------------------
--- 8、角色和部门关联表  角色1-N部门
+-- 8、角色和部门关联表
 -- ----------------------------
 drop table if exists sys_role_dept;
 create table sys_role_dept (
@@ -387,16 +392,13 @@ create table sys_role_dept (
   primary key(role_id, dept_id)
 ) engine=innodb comment = '角色和部门关联表';
 
--- ----------------------------
--- 初始化-角色和部门关联表数据
--- ----------------------------
 insert into sys_role_dept values ('2', '100');
 insert into sys_role_dept values ('2', '101');
 insert into sys_role_dept values ('2', '105');
 
 
 -- ----------------------------
--- 9、用户与岗位关联表  用户1-N岗位
+-- 9、用户与岗位关联表
 -- ----------------------------
 drop table if exists sys_user_post;
 create table sys_user_post
@@ -406,9 +408,6 @@ create table sys_user_post
   primary key (user_id, post_id)
 ) engine=innodb comment = '用户与岗位关联表';
 
--- ----------------------------
--- 初始化-用户与岗位关联表数据
--- ----------------------------
 insert into sys_user_post values ('1', '1');
 insert into sys_user_post values ('2', '2');
 
@@ -639,9 +638,6 @@ create table sys_notice (
   primary key (notice_id)
 ) engine=innodb auto_increment=10 comment = '通知公告表';
 
--- ----------------------------
--- 初始化-公告信息表数据
--- ----------------------------
 insert into sys_notice values('1', '温馨提醒：2018-07-01 闻道新版本发布啦', '2', '新版本内容', '0', 'admin', sysdate(), '', null, '管理员');
 insert into sys_notice values('2', '维护通知：2018-07-01 闻道系统凌晨维护', '1', '维护内容',   '0', 'admin', sysdate(), '', null, '管理员');
 insert into sys_notice values('3', '闻道开源框架介绍', '1', '<p><span style=\"color: rgb(230, 0, 0);\">项目介绍</span></p><p><font color=\"#333333\">WenDao开源项目是为企业用户定制的后台脚手架框架，为企业打造的一站式解决方案，降低企业开发成本，提升开发效率。主要包括用户管理、角色管理、部门管理、菜单管理、参数管理、字典管理、</font><span style=\"color: rgb(51, 51, 51);\">岗位管理</span><span style=\"color: rgb(51, 51, 51);\">、定时任务</span><span style=\"color: rgb(51, 51, 51);\">、</span><span style=\"color: rgb(51, 51, 51);\">服务监控、登录日志、操作日志、代码生成等功能。其中，还支持多数据源、数据权限、国际化、Redis缓存、Docker部署、滑动验证码、第三方认证登录、分布式事务、</span><font color=\"#333333\">分布式文件存储</font><span style=\"color: rgb(51, 51, 51);\">、分库分表处理等技术特点。</span></p><p><img src=\"https://foruda.gitee.com/images/1773931848342439032/a4d22313_1815095.png\" style=\"width: 64px;\"><br></p><p><span style=\"color: rgb(230, 0, 0);\">官网及演示</span></p><p><span style=\"color: rgb(51, 51, 51);\">闻道官网地址：&nbsp;</span><a href=\"http://wendao.vip\" target=\"_blank\">http://wendao.vip</a><a href=\"http://wendao.vip\" target=\"_blank\"></a></p><p><span style=\"color: rgb(51, 51, 51);\">若依文档地址：&nbsp;</span><a href=\"http://doc.wendao.vip\" target=\"_blank\">http://doc.wendao.vip</a><br></p><p><span style=\"color: rgb(51, 51, 51);\">演示地址【不分离版】：&nbsp;</span><a href=\"http://demo.wendao.vip\" target=\"_blank\">http://demo.wendao.vip</a></p><p><span style=\"color: rgb(51, 51, 51);\">演示地址【分离版本】：&nbsp;</span><a href=\"http://vue.wendao.vip\" target=\"_blank\">http://vue.wendao.vip</a></p><p><span style=\"color: rgb(51, 51, 51);\">演示地址【微服务版】：&nbsp;</span><a href=\"http://cloud.wendao.vip\" target=\"_blank\">http://cloud.wendao.vip</a></p><p><span style=\"color: rgb(51, 51, 51);\">演示地址【移动端版】：&nbsp;</span><a href=\"http://h5.wendao.vip\" target=\"_blank\">http://h5.wendao.vip</a></p><p><br style=\"color: rgb(48, 49, 51); font-family: &quot;Helvetica Neue&quot;, Helvetica, Arial, sans-serif; font-size: 12px;\"></p>', '0', 'admin', sysdate(), '', null, '管理员');
@@ -721,3 +717,494 @@ create table gen_table_column (
   update_time       datetime                                   comment '更新时间',
   primary key (column_id)
 ) engine=innodb auto_increment=1 comment = '代码生成业务表字段';
+
+
+-- ============================================================
+-- 第二部分：Quartz 定时任务表（原 quartz.sql）
+-- ============================================================
+
+DROP TABLE IF EXISTS QRTZ_FIRED_TRIGGERS;
+DROP TABLE IF EXISTS QRTZ_PAUSED_TRIGGER_GRPS;
+DROP TABLE IF EXISTS QRTZ_SCHEDULER_STATE;
+DROP TABLE IF EXISTS QRTZ_LOCKS;
+DROP TABLE IF EXISTS QRTZ_SIMPLE_TRIGGERS;
+DROP TABLE IF EXISTS QRTZ_SIMPROP_TRIGGERS;
+DROP TABLE IF EXISTS QRTZ_CRON_TRIGGERS;
+DROP TABLE IF EXISTS QRTZ_BLOB_TRIGGERS;
+DROP TABLE IF EXISTS QRTZ_TRIGGERS;
+DROP TABLE IF EXISTS QRTZ_JOB_DETAILS;
+DROP TABLE IF EXISTS QRTZ_CALENDARS;
+
+create table QRTZ_JOB_DETAILS (
+    sched_name           varchar(120)    not null,
+    job_name             varchar(200)    not null,
+    job_group            varchar(200)    not null,
+    description          varchar(250)    null,
+    job_class_name       varchar(250)    not null,
+    is_durable           varchar(1)      not null,
+    is_nonconcurrent     varchar(1)      not null,
+    is_update_data       varchar(1)      not null,
+    requests_recovery    varchar(1)      not null,
+    job_data             blob            null,
+    primary key (sched_name, job_name, job_group)
+) engine=innodb comment = '任务详细信息表';
+
+create table QRTZ_TRIGGERS (
+    sched_name           varchar(120)    not null,
+    trigger_name         varchar(200)    not null,
+    trigger_group        varchar(200)    not null,
+    job_name             varchar(200)    not null,
+    job_group            varchar(200)    not null,
+    description          varchar(250)    null,
+    next_fire_time       bigint(13)      null,
+    prev_fire_time       bigint(13)      null,
+    priority             integer         null,
+    trigger_state        varchar(16)     not null,
+    trigger_type         varchar(8)      not null,
+    start_time           bigint(13)      not null,
+    end_time             bigint(13)      null,
+    calendar_name        varchar(200)    null,
+    misfire_instr        smallint(2)     null,
+    job_data             blob            null,
+    primary key (sched_name, trigger_name, trigger_group),
+    foreign key (sched_name, job_name, job_group) references QRTZ_JOB_DETAILS(sched_name, job_name, job_group)
+) engine=innodb comment = '触发器详细信息表';
+
+create table QRTZ_SIMPLE_TRIGGERS (
+    sched_name           varchar(120)    not null,
+    trigger_name         varchar(200)    not null,
+    trigger_group        varchar(200)    not null,
+    repeat_count         bigint(7)       not null,
+    repeat_interval      bigint(12)      not null,
+    times_triggered      bigint(10)      not null,
+    primary key (sched_name, trigger_name, trigger_group),
+    foreign key (sched_name, trigger_name, trigger_group) references QRTZ_TRIGGERS(sched_name, trigger_name, trigger_group)
+) engine=innodb comment = '简单触发器的信息表';
+
+create table QRTZ_CRON_TRIGGERS (
+    sched_name           varchar(120)    not null,
+    trigger_name         varchar(200)    not null,
+    trigger_group        varchar(200)    not null,
+    cron_expression      varchar(200)    not null,
+    time_zone_id         varchar(80),
+    primary key (sched_name, trigger_name, trigger_group),
+    foreign key (sched_name, trigger_name, trigger_group) references QRTZ_TRIGGERS(sched_name, trigger_name, trigger_group)
+) engine=innodb comment = 'Cron类型的触发器表';
+
+create table QRTZ_BLOB_TRIGGERS (
+    sched_name           varchar(120)    not null,
+    trigger_name         varchar(200)    not null,
+    trigger_group        varchar(200)    not null,
+    blob_data            blob            null,
+    primary key (sched_name, trigger_name, trigger_group),
+    foreign key (sched_name, trigger_name, trigger_group) references QRTZ_TRIGGERS(sched_name, trigger_name, trigger_group)
+) engine=innodb comment = 'Blob类型的触发器表';
+
+create table QRTZ_CALENDARS (
+    sched_name           varchar(120)    not null,
+    calendar_name        varchar(200)    not null,
+    calendar             blob            not null,
+    primary key (sched_name, calendar_name)
+) engine=innodb comment = '日历信息表';
+
+create table QRTZ_PAUSED_TRIGGER_GRPS (
+    sched_name           varchar(120)    not null,
+    trigger_group        varchar(200)    not null,
+    primary key (sched_name, trigger_group)
+) engine=innodb comment = '暂停的触发器表';
+
+create table QRTZ_FIRED_TRIGGERS (
+    sched_name           varchar(120)    not null,
+    entry_id             varchar(95)     not null,
+    trigger_name         varchar(200)    not null,
+    trigger_group        varchar(200)    not null,
+    instance_name        varchar(200)    not null,
+    fired_time           bigint(13)      not null,
+    sched_time           bigint(13)      not null,
+    priority             integer         not null,
+    state                varchar(16)     not null,
+    job_name             varchar(200)    null,
+    job_group            varchar(200)    null,
+    is_nonconcurrent     varchar(1)      null,
+    requests_recovery    varchar(1)      null,
+    primary key (sched_name, entry_id)
+) engine=innodb comment = '已触发的触发器表';
+
+create table QRTZ_SCHEDULER_STATE (
+    sched_name           varchar(120)    not null,
+    instance_name        varchar(200)    not null,
+    last_checkin_time    bigint(13)      not null,
+    checkin_interval     bigint(13)      not null,
+    primary key (sched_name, instance_name)
+) engine=innodb comment = '调度器状态表';
+
+create table QRTZ_LOCKS (
+    sched_name           varchar(120)    not null,
+    lock_name            varchar(40)     not null,
+    primary key (sched_name, lock_name)
+) engine=innodb comment = '存储的悲观锁信息表';
+
+create table QRTZ_SIMPROP_TRIGGERS (
+    sched_name           varchar(120)    not null,
+    trigger_name         varchar(200)    not null,
+    trigger_group        varchar(200)    not null,
+    str_prop_1           varchar(512)    null,
+    str_prop_2           varchar(512)    null,
+    str_prop_3           varchar(512)    null,
+    int_prop_1           int             null,
+    int_prop_2           int             null,
+    long_prop_1          bigint          null,
+    long_prop_2          bigint          null,
+    dec_prop_1           numeric(13,4)   null,
+    dec_prop_2           numeric(13,4)   null,
+    bool_prop_1          varchar(1)      null,
+    bool_prop_2          varchar(1)      null,
+    primary key (sched_name, trigger_name, trigger_group),
+    foreign key (sched_name, trigger_name, trigger_group) references QRTZ_TRIGGERS(sched_name, trigger_name, trigger_group)
+) engine=innodb comment = '同步机制的行锁表';
+
+
+-- ============================================================
+-- 第三部分：AI 新闻核心业务表（原 wendao_news.sql）
+-- ============================================================
+
+-- 新闻来源表
+DROP TABLE IF EXISTS `news_source`;
+CREATE TABLE `news_source`
+(
+    `id`              BIGINT(20)   NOT NULL AUTO_INCREMENT COMMENT '主键ID',
+    `name`            VARCHAR(100) NOT NULL COMMENT '来源名称（如 Hacker News、知乎热榜）',
+    `type`            CHAR(1)      NOT NULL DEFAULT '0' COMMENT '来源类型：0=国内 1=国外',
+    `url`             VARCHAR(500) NOT NULL COMMENT '新闻源地址（API/RSS/网页）',
+    `fetch_type`      VARCHAR(20)  NOT NULL DEFAULT 'RSS' COMMENT '抓取方式：RSS / API / CRAWL',
+    `fetch_interval`  INT(11)      NOT NULL DEFAULT 30 COMMENT '抓取间隔（分钟）',
+    `fetch_config`    JSON                  DEFAULT NULL COMMENT '额外配置（请求头、参数等）',
+    `status`          CHAR(1)      NOT NULL DEFAULT '0' COMMENT '状态：0=启用 1=停用',
+    `create_by`       VARCHAR(64)           DEFAULT '' COMMENT '创建者',
+    `create_time`     DATETIME              DEFAULT CURRENT_TIMESTAMP COMMENT '创建时间',
+    `update_by`       VARCHAR(64)           DEFAULT '' COMMENT '更新者',
+    `update_time`     DATETIME              DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP COMMENT '更新时间',
+    `remark`          VARCHAR(500)          DEFAULT NULL COMMENT '备注',
+    PRIMARY KEY (`id`),
+    INDEX `idx_type_status` (`type`, `status`)
+) ENGINE = InnoDB AUTO_INCREMENT = 100 DEFAULT CHARSET = utf8mb4 COMMENT ='新闻来源表';
+
+-- 新闻文章表
+DROP TABLE IF EXISTS `news_article`;
+CREATE TABLE `news_article`
+(
+    `id`              BIGINT(20)   NOT NULL AUTO_INCREMENT COMMENT '主键ID',
+    `source_id`       BIGINT(20)            DEFAULT NULL COMMENT '新闻来源ID（关键词搜索时为NULL）',
+    `source_name`     VARCHAR(100)          DEFAULT NULL COMMENT '来源名称（冗余，方便查询）',
+    `title`           VARCHAR(500) NOT NULL COMMENT '文章标题',
+    `summary`         TEXT                  DEFAULT NULL COMMENT 'AI 生成的摘要',
+    `content`         LONGTEXT              DEFAULT NULL COMMENT '原始内容/正文',
+    `original_url`    VARCHAR(500)          DEFAULT NULL COMMENT '原始链接',
+    `language`        CHAR(2)      NOT NULL DEFAULT 'zh' COMMENT '语言：zh=中文 en=英文 ja=日文 等',
+    `tags`            JSON                  DEFAULT NULL COMMENT 'AI 提取的标签，JSON数组，如 ["AI","科技"]',
+    `sentiment`       VARCHAR(20)           DEFAULT NULL COMMENT '情感分析：positive / negative / neutral',
+    `keywords`        VARCHAR(500)          DEFAULT NULL COMMENT 'AI 提取的关键词，逗号分隔',
+    `publish_time`    DATETIME              DEFAULT NULL COMMENT '新闻发布时间',
+    `fetch_time`      DATETIME              DEFAULT CURRENT_TIMESTAMP COMMENT '抓取入库时间',
+    `is_pushed`       TINYINT(1)   NOT NULL DEFAULT 0 COMMENT '是否已推送：0=未推送 1=已推送',
+    `push_time`       DATETIME              DEFAULT NULL COMMENT '推送时间',
+    `read_count`      INT(11)      NOT NULL DEFAULT 0 COMMENT '阅读次数',
+    `status`          CHAR(1)      NOT NULL DEFAULT '0' COMMENT '状态：0=正常 1=下架',
+    `create_by`       VARCHAR(64)           DEFAULT '' COMMENT '创建者',
+    `create_time`     DATETIME              DEFAULT CURRENT_TIMESTAMP COMMENT '创建时间',
+    `update_by`       VARCHAR(64)           DEFAULT '' COMMENT '更新者',
+    `update_time`     DATETIME              DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP COMMENT '更新时间',
+    `remark`          VARCHAR(500)          DEFAULT NULL COMMENT '备注',
+    PRIMARY KEY (`id`),
+    INDEX `idx_source_id` (`source_id`),
+    INDEX `idx_language` (`language`),
+    INDEX `idx_sentiment` (`sentiment`),
+    INDEX `idx_publish_time` (`publish_time`),
+    INDEX `idx_fetch_time` (`fetch_time`),
+    INDEX `idx_is_pushed` (`is_pushed`),
+    FULLTEXT INDEX `ft_title_summary` (`title`, `summary`) WITH PARSER ngram
+) ENGINE = InnoDB AUTO_INCREMENT = 1000 DEFAULT CHARSET = utf8mb4 COMMENT ='新闻文章表';
+
+-- 新闻推送记录表
+DROP TABLE IF EXISTS `news_push_log`;
+CREATE TABLE `news_push_log`
+(
+    `id`              BIGINT(20) NOT NULL AUTO_INCREMENT COMMENT '主键ID',
+    `article_id`      BIGINT(20) NOT NULL COMMENT '文章ID',
+    `push_time`       DATETIME            DEFAULT CURRENT_TIMESTAMP COMMENT '推送时间',
+    `push_status`     CHAR(1)   NOT NULL DEFAULT '0' COMMENT '推送状态：0=成功 1=失败',
+    `push_type`       VARCHAR(20)         DEFAULT 'WEBSOCKET' COMMENT '推送方式：WEBSOCKET / EMAIL / WECHAT',
+    `error_msg`       VARCHAR(2000)       DEFAULT NULL COMMENT '失败原因',
+    `create_time`     DATETIME            DEFAULT CURRENT_TIMESTAMP COMMENT '创建时间',
+    PRIMARY KEY (`id`),
+    INDEX `idx_article_id` (`article_id`),
+    INDEX `idx_push_time` (`push_time`)
+) ENGINE = InnoDB AUTO_INCREMENT = 1000 DEFAULT CHARSET = utf8mb4 COMMENT ='新闻推送记录表';
+
+-- 初始化示例数据（国内 + 国外新闻源）
+INSERT INTO `news_source` (`name`, `type`, `url`, `fetch_type`, `fetch_interval`, `fetch_config`, `status`) VALUES
+('知乎热榜',    '0', 'https://www.zhihu.com/api/v3/feed/topstory/hot-lists/total?limit=20', 'API',  15, '{"headers":{"User-Agent":"Mozilla/5.0"}}', '0'),
+('微博热搜',    '0', 'https://weibo.com/ajax/side/hotSearch',                                   'API',  15, '{"headers":{"User-Agent":"Mozilla/5.0"}}', '0'),
+('36氪快讯',    '0', 'https://36kr.com/newsflashes',                                            'CRAWL',20, '{}', '0'),
+('IT之家',      '0', 'https://www.ithome.com/rss/',                                              'RSS',  20, '{}', '0'),
+('机器之心',    '0', 'https://www.jiqizhixin.com/rss',                                          'RSS',  30, '{}', '0'),
+('Hacker News', '1', 'https://hacker-news.firebaseio.com/v0/topstories.json',                    'API',  10, '{}', '0'),
+('TechCrunch',  '1', 'https://techcrunch.com/feed/',                                             'RSS',  30, '{}', '0'),
+('Ars Technica','1', 'https://feeds.arstechnica.com/arstechnica/index',                          'RSS',  30, '{}', '0'),
+('The Verge',   '1', 'https://www.theverge.com/rss/index.xml',                                   'RSS',  30, '{}', '0'),
+('Dev.to',      '1', 'https://dev.to/feed',                                                      'RSS',  30, '{}', '0');
+
+
+-- ============================================================
+-- 第四部分：AI 新闻菜单权限（原 news_menu.sql）
+-- ============================================================
+
+-- 一级目录：AI新闻 (menu_id=2000, parent_id=0)
+INSERT INTO `sys_menu` VALUES ('2000', 'AI新闻', '0', '5', 'news', NULL, '', 'News', 1, 0, 'M', '0', '0', '', 'monitor', 'admin', sysdate(), '', NULL, 'AI新闻模块目录');
+
+-- 二级菜单
+INSERT INTO `sys_menu` VALUES ('2001', '新闻大屏', '2000', '1', 'dashboard', 'news/dashboard/index', '', 'NewsDashboard', 1, 0, 'C', '0', '0', '', 'dashboard', 'admin', sysdate(), '', NULL, '新闻大屏菜单');
+INSERT INTO `sys_menu` VALUES ('2002', '新闻源管理', '2000', '2', 'source', 'news/source/index', '', 'NewsSource', 1, 0, 'C', '0', '0', 'news:source:list', 'tree', 'admin', sysdate(), '', NULL, '新闻源管理菜单');
+INSERT INTO `sys_menu` VALUES ('2003', '文章管理', '2000', '3', 'article', 'news/article/index', '', 'NewsArticle', 1, 0, 'C', '0', '0', 'news:article:list', 'list', 'admin', sysdate(), '', NULL, '文章管理菜单');
+
+-- 新闻源管理按钮权限 (parent_id=2002)
+INSERT INTO `sys_menu` VALUES ('2004', '新闻源查询', '2002', '1', '', '', '', '', 1, 0, 'F', '0', '0', 'news:source:query', '#', 'admin', sysdate(), '', NULL, '');
+INSERT INTO `sys_menu` VALUES ('2005', '新闻源新增', '2002', '2', '', '', '', '', 1, 0, 'F', '0', '0', 'news:source:add',   '#', 'admin', sysdate(), '', NULL, '');
+INSERT INTO `sys_menu` VALUES ('2006', '新闻源修改', '2002', '3', '', '', '', '', 1, 0, 'F', '0', '0', 'news:source:edit',  '#', 'admin', sysdate(), '', NULL, '');
+INSERT INTO `sys_menu` VALUES ('2007', '新闻源删除', '2002', '4', '', '', '', '', 1, 0, 'F', '0', '0', 'news:source:remove','#', 'admin', sysdate(), '', NULL, '');
+
+-- 文章管理按钮权限 (parent_id=2003)
+INSERT INTO `sys_menu` VALUES ('2008', '文章查询', '2003', '1', '', '', '', '', 1, 0, 'F', '0', '0', 'news:article:query', '#', 'admin', sysdate(), '', NULL, '');
+INSERT INTO `sys_menu` VALUES ('2009', '文章修改', '2003', '2', '', '', '', '', 1, 0, 'F', '0', '0', 'news:article:edit',  '#', 'admin', sysdate(), '', NULL, '');
+INSERT INTO `sys_menu` VALUES ('2010', '文章删除', '2003', '3', '', '', '', '', 1, 0, 'F', '0', '0', 'news:article:remove','#', 'admin', sysdate(), '', NULL, '');
+INSERT INTO `sys_menu` VALUES ('2011', '文章推送', '2003', '4', '', '', '', '', 1, 0, 'F', '0', '0', 'news:article:push',  '#', 'admin', sysdate(), '', NULL, '');
+
+-- 分配菜单权限给普通角色 (role_id=2)
+INSERT INTO `sys_role_menu` VALUES ('2', '2000');
+INSERT INTO `sys_role_menu` VALUES ('2', '2001');
+INSERT INTO `sys_role_menu` VALUES ('2', '2002');
+INSERT INTO `sys_role_menu` VALUES ('2', '2003');
+INSERT INTO `sys_role_menu` VALUES ('2', '2004');
+INSERT INTO `sys_role_menu` VALUES ('2', '2005');
+INSERT INTO `sys_role_menu` VALUES ('2', '2006');
+INSERT INTO `sys_role_menu` VALUES ('2', '2007');
+INSERT INTO `sys_role_menu` VALUES ('2', '2008');
+INSERT INTO `sys_role_menu` VALUES ('2', '2009');
+INSERT INTO `sys_role_menu` VALUES ('2', '2010');
+INSERT INTO `sys_role_menu` VALUES ('2', '2011');
+
+
+-- ============================================================
+-- 第五部分：关键词监控功能（原 news_keyword_upgrade.sql）
+-- ============================================================
+
+-- 新闻关键词表
+CREATE TABLE IF NOT EXISTS `news_keyword` (
+  `id`              BIGINT(20)   NOT NULL AUTO_INCREMENT COMMENT '主键ID',
+  `text`            VARCHAR(200) NOT NULL COMMENT '关键词',
+  `category`        VARCHAR(100) DEFAULT NULL COMMENT '分类',
+  `is_active`       TINYINT(1)   NOT NULL DEFAULT 1 COMMENT '是否启用：1=启用 0=停用',
+  `fetch_interval`  INT(11)      NOT NULL DEFAULT 30 COMMENT '抓取间隔(分钟)',
+  `last_fetch_time` DATETIME     DEFAULT NULL COMMENT '上次抓取时间',
+  `create_by`       VARCHAR(64)  DEFAULT '' COMMENT '创建者',
+  `create_time`     DATETIME     DEFAULT CURRENT_TIMESTAMP COMMENT '创建时间',
+  `update_by`       VARCHAR(64)  DEFAULT '' COMMENT '更新者',
+  `update_time`     DATETIME     DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP COMMENT '更新时间',
+  `remark`          VARCHAR(500) DEFAULT NULL COMMENT '备注',
+  PRIMARY KEY (`id`),
+  INDEX `idx_is_active` (`is_active`)
+) ENGINE=InnoDB AUTO_INCREMENT=100 DEFAULT CHARSET=utf8mb4 COMMENT='新闻关键词表';
+
+-- news_article 新增关键词相关字段
+ALTER TABLE `news_article`
+  ADD COLUMN `keyword_id` BIGINT(20) DEFAULT NULL COMMENT '关联关键词ID(NULL=来源抓取)',
+  ADD COLUMN `is_real` TINYINT(1) DEFAULT 1 COMMENT 'AI判断是否真实：1=真实 0=虚假',
+  ADD COLUMN `relevance` INT(11) DEFAULT 0 COMMENT '相关性评分0-100',
+  ADD COLUMN `relevance_reason` VARCHAR(500) DEFAULT NULL COMMENT 'AI相关性理由',
+  ADD COLUMN `keyword_mentioned` TINYINT(1) DEFAULT 0 COMMENT '是否直接提及关键词',
+  ADD COLUMN `importance` VARCHAR(20) DEFAULT 'low' COMMENT '重要性：low/medium/high/urgent';
+
+ALTER TABLE `news_article`
+  ADD INDEX `idx_keyword_id` (`keyword_id`),
+  ADD INDEX `idx_importance` (`importance`);
+
+-- 新增搜索源
+INSERT IGNORE INTO `news_source` (`name`, `type`, `url`, `fetch_type`, `fetch_interval`, `fetch_config`, `status`) VALUES
+('Bing搜索', '0', 'https://www.bing.com/search?q=', 'SEARCH', 30, '{"headers":{"User-Agent":"Mozilla/5.0"}}', '0'),
+('搜狗搜索', '0', 'https://www.sogou.com/web?query=', 'SEARCH', 30, '{"headers":{"User-Agent":"Mozilla/5.0"}}', '0'),
+('B站搜索', '0', 'https://api.bilibili.com/x/web-interface/search/type?search_type=video&keyword=', 'SEARCH', 30, '{"headers":{"User-Agent":"Mozilla/5.0","Referer":"https://search.bilibili.com/"}}', '0'),
+('微博热搜', '0', 'https://weibo.com/ajax/side/hotSearch', 'SEARCH', 15, '{"headers":{"User-Agent":"Mozilla/5.0","Referer":"https://weibo.com/"}}', '0');
+
+
+-- ============================================================
+-- 第六部分：关键词监控菜单（原 news_keyword_menu.sql）
+-- ============================================================
+
+INSERT INTO `sys_menu` VALUES ('2012', '关键词监控', '2000', '4', 'monitor', 'news/keyword/index', '', 'NewsKeyword', 1, 0, 'C', '0', '0', 'news:keyword:list', 'monitor', 'admin', sysdate(), '', NULL, '关键词监控菜单');
+
+INSERT INTO `sys_menu` VALUES ('2013', '关键词查询', '2012', '1', '', '', '', '', 1, 0, 'F', '0', '0', 'news:keyword:query', '#', 'admin', sysdate(), '', NULL, '');
+INSERT INTO `sys_menu` VALUES ('2014', '关键词新增', '2012', '2', '', '', '', '', 1, 0, 'F', '0', '0', 'news:keyword:add',   '#', 'admin', sysdate(), '', NULL, '');
+INSERT INTO `sys_menu` VALUES ('2015', '关键词修改', '2012', '3', '', '', '', '', 1, 0, 'F', '0', '0', 'news:keyword:edit',  '#', 'admin', sysdate(), '', NULL, '');
+INSERT INTO `sys_menu` VALUES ('2016', '关键词删除', '2012', '4', '', '', '', '', 1, 0, 'F', '0', '0', 'news:keyword:remove','#', 'admin', sysdate(), '', NULL, '');
+
+INSERT INTO `sys_role_menu` VALUES ('2', '2012');
+INSERT INTO `sys_role_menu` VALUES ('2', '2013');
+INSERT INTO `sys_role_menu` VALUES ('2', '2014');
+INSERT INTO `sys_role_menu` VALUES ('2', '2015');
+INSERT INTO `sys_role_menu` VALUES ('2', '2016');
+
+
+-- ============================================================
+-- 第七部分：关键词驱动改造（原 news_keyword_driven.sql）
+-- ============================================================
+
+-- news_source 新增字段：优先级、配额、抓取模式
+ALTER TABLE news_source
+  ADD COLUMN priority VARCHAR(20) DEFAULT 'medium' COMMENT '优先级: high/medium/low',
+  ADD COLUMN max_articles_per_fetch INT DEFAULT 10 COMMENT '每次抓取最大文章数',
+  ADD COLUMN fetch_mode VARCHAR(20) DEFAULT 'PRIMARY' COMMENT 'PRIMARY=主力/SUPPLEMENTARY=辅助';
+
+-- news_keyword 新增字段：相关性阈值、扩展查询词
+ALTER TABLE news_keyword
+  ADD COLUMN relevance_threshold INT DEFAULT 40 COMMENT '相关性阈值,低于此值自动下架',
+  ADD COLUMN expand_queries JSON DEFAULT NULL COMMENT '扩展查询词列表';
+
+-- news_article 新增字段：来源方式标记
+ALTER TABLE news_article
+  ADD COLUMN fetch_origin VARCHAR(20) DEFAULT 'SOURCE' COMMENT '来源方式: KEYWORD/SOURCE';
+
+-- 允许 source_id 为 NULL（关键词搜索文章无固定来源）
+ALTER TABLE news_article
+  MODIFY COLUMN source_id BIGINT(20) DEFAULT NULL COMMENT '新闻来源ID（关键词搜索时为NULL）';
+
+-- 回填历史数据
+UPDATE news_article SET fetch_origin = 'KEYWORD' WHERE keyword_id IS NOT NULL;
+
+-- 初始来源配置：高质量源标记为 PRIMARY + high 优先级
+UPDATE news_source SET priority='high', fetch_mode='PRIMARY', max_articles_per_fetch=15
+  WHERE name IN ('36氪快讯','IT之家');
+
+-- 其他来源降级为 SUPPLEMENTARY
+UPDATE news_source SET priority='medium', fetch_mode='SUPPLEMENTARY', max_articles_per_fetch=10
+  WHERE fetch_type IN ('RSS','API') AND name NOT IN ('36氪快讯','IT之家');
+
+-- 查询扩展表
+CREATE TABLE IF NOT EXISTS news_query_expansion (
+  id BIGINT AUTO_INCREMENT PRIMARY KEY,
+  keyword_id BIGINT COMMENT '关联 news_keyword.id',
+  expanded_term VARCHAR(200) NOT NULL COMMENT '扩展词',
+  expansion_type VARCHAR(20) DEFAULT 'RELATED' COMMENT 'SYNONYM/RELATED/AI_GENERATED',
+  is_active TINYINT(1) DEFAULT 1,
+  create_time DATETIME DEFAULT CURRENT_TIMESTAMP,
+  INDEX idx_keyword_id (keyword_id),
+  INDEX idx_is_active (is_active)
+) COMMENT='查询扩展词表';
+
+
+-- ============================================================
+-- 第八部分：提示词配置改造（原 news_prompt_upgrade.sql）
+-- ============================================================
+
+-- 提示词-新闻类型多对多关联中间表
+CREATE TABLE IF NOT EXISTS `news_prompt_type_relation` (
+  `prompt_config_id` BIGINT(20) NOT NULL COMMENT '提示词配置ID',
+  `type_config_id`   BIGINT(20) NOT NULL COMMENT '新闻类型ID',
+  PRIMARY KEY (`prompt_config_id`, `type_config_id`),
+  INDEX `idx_type_config_id` (`type_config_id`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='提示词-新闻类型关联表';
+
+-- 迁移现有数据到中间表
+INSERT INTO `news_prompt_type_relation` (prompt_config_id, type_config_id)
+SELECT id, type_config_id FROM `news_prompt_config` WHERE type_config_id IS NOT NULL;
+
+-- 删除旧字段
+ALTER TABLE `news_prompt_config`
+  DROP COLUMN `type_config_id`,
+  DROP COLUMN `model`;
+
+
+-- ============================================================
+-- 第九部分：AI 解读功能（原 news_interpretation.sql）
+-- ============================================================
+
+CREATE TABLE IF NOT EXISTS `news_interpretation` (
+  `id`               bigint(20)   NOT NULL AUTO_INCREMENT           COMMENT '主键ID',
+  `article_id`       bigint(20)   NOT NULL                          COMMENT '关联新闻文章ID（news_article.id）',
+  `prompt_config_id` bigint(20)   DEFAULT NULL                      COMMENT '使用的提示词配置ID（news_prompt_config.id）',
+  `prompt_snapshot`  text         DEFAULT NULL                      COMMENT '解读时提示词快照（防止提示词修改后无法追溯）',
+  `content`          longtext     DEFAULT NULL                      COMMENT '解读结果内容（Markdown格式，含mermaid流程图）',
+  `status`           char(1)      NOT NULL DEFAULT '0'              COMMENT '解读状态：0=进行中 1=完成 2=失败',
+  `error_msg`        varchar(500) DEFAULT NULL                      COMMENT '失败原因描述',
+  `tokens_used`      int(11)      DEFAULT NULL                      COMMENT '本次解读消耗的token数',
+  `model_name`       varchar(100) DEFAULT NULL                      COMMENT '使用的AI模型名称（如deepseek-chat）',
+  `interpret_count`  int(11)      NOT NULL DEFAULT 1                COMMENT '第几次解读（从1开始递增，用于版本追踪）',
+  `create_by`        varchar(64)  NOT NULL DEFAULT ''               COMMENT '创建人（操作用户名）',
+  `create_time`      datetime     DEFAULT NULL                      COMMENT '创建时间（发起解读的时间）',
+  `update_time`      datetime     DEFAULT NULL                      COMMENT '更新时间（完成/失败的时间）',
+  PRIMARY KEY (`id`),
+  KEY `idx_article_id` (`article_id`),
+  KEY `idx_status`     (`status`),
+  KEY `idx_create_time`(`create_time`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='新闻解读记录表';
+
+
+-- ============================================================
+-- 第十部分：AI 模型配置管理 + 字典（原 news_model_config.sql）
+-- ============================================================
+
+DROP TABLE IF EXISTS `news_model_config`;
+CREATE TABLE `news_model_config` (
+    `id`                 BIGINT(20)   NOT NULL AUTO_INCREMENT COMMENT '主键ID',
+    `name`               VARCHAR(100)  NOT NULL COMMENT '配置名称（如"DeepSeek主模型"）',
+    `provider`           VARCHAR(50)   NOT NULL DEFAULT 'DEEPSEEK' COMMENT '提供商：DEEPSEEK/SILICONFLOW/BAILIAN/ZHIPU/VOLCENGINE/CUSTOM',
+    `api_url`            VARCHAR(500)  NOT NULL COMMENT 'API地址',
+    `api_key`            VARCHAR(500)  NOT NULL COMMENT 'API密钥（AES加密存储）',
+    `model_name`         VARCHAR(100)  NOT NULL COMMENT '模型名称（如 deepseek-chat）',
+    `priority`           INT(11)       NOT NULL DEFAULT 1 COMMENT '优先级，数字越小越优先，0=禁用',
+    `max_tokens`         INT(11)       DEFAULT 2000 COMMENT '默认最大输出token数',
+    `temperature`        DECIMAL(3,2)  DEFAULT 0.30 COMMENT '默认温度参数',
+    `support_json_mode`  TINYINT(1)    NOT NULL DEFAULT 1 COMMENT '是否支持JSON结构化输出',
+    `support_stream`     TINYINT(1)    NOT NULL DEFAULT 1 COMMENT '是否支持流式输出(SSE)',
+    `usage_type`         VARCHAR(100)  NOT NULL DEFAULT 'ALL' COMMENT '适用场景：INTERPRET/ANALYSIS/EXPANSION/ALL（逗号分隔）',
+    `timeout_ms`         INT(11)       DEFAULT 30000 COMMENT '请求超时（毫秒）',
+    `retry_count`        INT(11)       DEFAULT 1 COMMENT '失败重试次数',
+    `is_active`          TINYINT(1)    NOT NULL DEFAULT 1 COMMENT '0=停用 1=启用',
+    `remark`             VARCHAR(500)  DEFAULT NULL COMMENT '备注',
+    `create_by`          VARCHAR(64)   DEFAULT '' COMMENT '创建者',
+    `create_time`        DATETIME      DEFAULT CURRENT_TIMESTAMP COMMENT '创建时间',
+    `update_by`          VARCHAR(64)   DEFAULT '' COMMENT '更新者',
+    `update_time`        DATETIME      DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP COMMENT '更新时间',
+    PRIMARY KEY (`id`),
+    INDEX `idx_priority` (`priority`),
+    INDEX `idx_active_usage` (`is_active`, `usage_type`)
+) ENGINE=InnoDB AUTO_INCREMENT=100 DEFAULT CHARSET=utf8mb4 COMMENT='AI模型配置表';
+
+-- 菜单：模型管理 (menu_id=2027, parent_id=2000 AI新闻)
+INSERT INTO `sys_menu` VALUES ('2027', '模型管理', '2000', '5', 'modelConfig', 'news/modelConfig/index', '', 'NewsModelConfig', 1, 0, 'C', '0', '0', 'news:model:list', 'setting', 'admin', sysdate(), '', NULL, 'AI模型配置管理');
+
+-- 按钮权限 (parent_id=2027)
+INSERT INTO `sys_menu` VALUES ('2028', '模型查询', '2027', '1', '', '', '', '', 1, 0, 'F', '0', '0', 'news:model:query', '#', 'admin', sysdate(), '', NULL, '');
+INSERT INTO `sys_menu` VALUES ('2029', '模型新增', '2027', '2', '', '', '', '', 1, 0, 'F', '0', '0', 'news:model:add',   '#', 'admin', sysdate(), '', NULL, '');
+INSERT INTO `sys_menu` VALUES ('2030', '模型修改', '2027', '3', '', '', '', '', 1, 0, 'F', '0', '0', 'news:model:edit',  '#', 'admin', sysdate(), '', NULL, '');
+INSERT INTO `sys_menu` VALUES ('2031', '模型删除', '2027', '4', '', '', '', '', 1, 0, 'F', '0', '0', 'news:model:remove','#', 'admin', sysdate(), '', NULL, '');
+
+-- 分配权限给普通角色 (role_id=2)
+INSERT INTO `sys_role_menu` VALUES ('2', '2027');
+INSERT INTO `sys_role_menu` VALUES ('2', '2028');
+INSERT INTO `sys_role_menu` VALUES ('2', '2029');
+INSERT INTO `sys_role_menu` VALUES ('2', '2030');
+INSERT INTO `sys_role_menu` VALUES ('2', '2031');
+
+-- 字典：模型提供商 (dict_type_id=11)
+INSERT INTO `sys_dict_type` VALUES (11, '模型提供商', 'news_model_provider', '0', 'admin', sysdate(), '', NULL, 'AI模型提供商列表');
+
+INSERT INTO `sys_dict_data` VALUES (30, 1, 'DeepSeek',    'DEEPSEEK',    'news_model_provider', '', 'success', 'Y', '0', 'admin', sysdate(), '', NULL, 'DeepSeek大模型');
+INSERT INTO `sys_dict_data` VALUES (31, 2, '硅基流动',    'SILICONFLOW', 'news_model_provider', '', 'warning', 'N', '0', 'admin', sysdate(), '', NULL, '硅基流动 SiliconFlow');
+INSERT INTO `sys_dict_data` VALUES (32, 3, '阿里百炼',    'BAILIAN',     'news_model_provider', '', '',        'N', '0', 'admin', sysdate(), '', NULL, '阿里百炼大模型平台');
+INSERT INTO `sys_dict_data` VALUES (33, 4, '智谱GLM',     'ZHIPU',       'news_model_provider', '', 'danger',  'N', '0', 'admin', sysdate(), '', NULL, '智谱AI GLM系列');
+INSERT INTO `sys_dict_data` VALUES (34, 5, '火山引擎',    'VOLCENGINE',  'news_model_provider', '', 'info',    'N', '0', 'admin', sysdate(), '', NULL, '字节跳动火山引擎');
+INSERT INTO `sys_dict_data` VALUES (35, 6, '自定义',      'CUSTOM',      'news_model_provider', '', '',        'N', '0', 'admin', sysdate(), '', NULL, '自定义API地址');
+
+-- ============================================================
+-- 初始化完成
+-- ============================================================
