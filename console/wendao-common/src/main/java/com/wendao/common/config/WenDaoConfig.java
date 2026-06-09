@@ -30,6 +30,9 @@ public class WenDaoConfig
     /** 验证码类型 */
     private static String captchaType;
 
+    /** AES加密密钥（32字符） */
+    private static String aesKey;
+
     public String getName()
     {
         return name;
@@ -86,6 +89,14 @@ public class WenDaoConfig
 
     public void setCaptchaType(String captchaType) {
         WenDaoConfig.captchaType = captchaType;
+    }
+
+    public static String getAesKey() {
+        return aesKey;
+    }
+
+    public void setAesKey(String aesKey) {
+        WenDaoConfig.aesKey = aesKey;
     }
 
     /**

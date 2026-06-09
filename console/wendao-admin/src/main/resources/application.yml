@@ -12,6 +12,8 @@ wendao:
   addressEnabled: false
   # 验证码类型 math 数字计算 char 字符验证
   captchaType: math
+  # AES加密密钥（32字符，用于敏感字段加解密）
+  aes-key: WenDao2026!AesKey#Secret@9876
 
 # 开发环境配置
 server:
@@ -73,7 +75,7 @@ spring:
       # 端口，默认为6379
       port: 6379
       # 数据库索引
-      database: 0
+      database: 3
       # 密码
       password:
       # 连接超时时间

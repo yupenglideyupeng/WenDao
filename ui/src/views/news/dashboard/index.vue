@@ -1,7 +1,8 @@
 <template>
-  <div class="news-dashboard">
-    <!-- 头部 -->
-    <header class="dashboard-header">
+  <div class="news-dashboard-wrapper">
+    <div class="news-dashboard">
+      <!-- 头部 -->
+      <header class="dashboard-header">
       <div class="header-left">
         <h1>🤖 AI 新闻实时大屏</h1>
         <span class="header-time">{{ currentTime }}</span>
@@ -111,14 +112,15 @@
         </el-card>
       </el-col>
     </el-row>
-  </div>
+    </div>
 
-  <!-- 一键解读对话框 -->
-  <NewsInterpretDialog
-    v-model="interpretOpen"
-    :article-id="interpretArticleId"
-    :article-title="interpretArticleTitle"
-  />
+    <!-- 一键解读对话框 -->
+    <NewsInterpretDialog
+      v-model="interpretOpen"
+      :article-id="interpretArticleId"
+      :article-title="interpretArticleTitle"
+    />
+  </div>
 </template>
 
 <script setup lang="ts" name="NewsDashboard">
@@ -156,6 +158,7 @@ function handleInterpret(article: NewsArticle) {
 // WebSocket
 let ws: WebSocket | null = null
 let reconnectTimer: number
+let wsDestroyed = false    // 组件销毁标记，阻止销毁后重连
 
 // 图表
 const sourceChartRef = ref<HTMLDivElement>()
@@ -203,7 +206,7 @@ function connectWebSocket() {
   }
   ws.onclose = () => {
     wsConnected.value = false
-    console.log('WebSocket disconnected, reconnecting in 5s...')
+    if (wsDestroyed) return
     reconnectTimer = window.setTimeout(connectWebSocket, 5000)
   }
   ws.onerror = (err) => {
@@ -328,6 +331,7 @@ onMounted(async () => {
 })
 
 onUnmounted(() => {
+  wsDestroyed = true
   clearInterval(timeTimer)
   clearTimeout(reconnectTimer)
   ws?.close()
@@ -338,6 +342,10 @@ onUnmounted(() => {
 </script>
 
 <style scoped>
+.news-dashboard-wrapper {
+  width: 100%;
+  min-height: 100vh;
+}
 .news-dashboard {
   padding: 0;
   background: linear-gradient(135deg, #0f1923 0%, #1a2332 100%);

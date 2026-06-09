@@ -66,7 +66,7 @@ export const constantRoutes = [
         path: '/index',
         component: () => import('@/views/news/dashboard/index.vue'),
         name: 'Index',
-        meta: { title: '首页', icon: 'dashboard', affix: true }
+        meta: { title: '首页', icon: 'dashboard', affix: true, noCache: true }
       }
     ]
   },
@@ -171,6 +171,7 @@ export const dynamicRoutes = [
     redirect: '/news/article',
     name: 'News',
     meta: { title: 'AI新闻', icon: 'monitor' },
+    permissions: ['news:article:list'],
     children: [
       {
         path: 'source',
@@ -201,6 +202,12 @@ export const dynamicRoutes = [
         component: () => import('@/views/news/promptConfig/index.vue'),
         name: 'NewsPromptConfig',
         meta: { title: '提示词配置', icon: 'documentation' }
+      },
+      {
+        path: 'modelConfig',
+        component: () => import('@/views/news/modelConfig/index.vue'),
+        name: 'NewsModelConfig',
+        meta: { title: '模型管理', icon: 'setting' }
       }
     ]
   }
