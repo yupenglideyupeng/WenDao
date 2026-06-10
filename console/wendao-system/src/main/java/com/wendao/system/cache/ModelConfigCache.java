@@ -141,6 +141,31 @@ public class ModelConfigCache
     }
 
     /**
+     * 获取全局模型状态（供前端判断 AI 功能是否可用）
+     */
+    public ModelStatus getModelStatus()
+    {
+        ModelStatus status = new ModelStatus();
+
+        // 统计所有模型
+        com.wendao.system.domain.NewsModelConfig query = new com.wendao.system.domain.NewsModelConfig();
+        List<NewsModelConfig> all = mapper.selectList(query);
+        status.setTotalModels(all != null ? all.size() : 0);
+        status.setActiveModels(all != null ? (int) all.stream().filter(m -> m.getIsActive() != null && m.getIsActive() == 1).count() : 0);
+
+        // 检查各场景
+        String[] scenes = {"INTERPRET", "ANALYSIS", "EXPANSION"};
+        for (String scene : scenes)
+        {
+            NewsModelConfig config = getModelConfig(scene);
+            status.getScenes().put(scene, config != null && StringUtils.isNotEmpty(config.getApiKey()));
+            status.getModelNames().put(scene, config != null ? config.getModelName() : null);
+        }
+
+        return status;
+    }
+
+    /**
      * 解密并返回新对象（不修改原对象）
      */
     private NewsModelConfig decryptAndCopy(NewsModelConfig source)

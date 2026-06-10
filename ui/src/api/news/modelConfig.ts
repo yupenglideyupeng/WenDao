@@ -31,3 +31,15 @@ export function delModelConfig(ids: number | number[]): Promise<AjaxResult> {
 export function testModelConfig(id: number): Promise<AjaxResult<{ success: boolean; message: string; modelName?: string }>> {
   return request({ url: '/news/model/test/' + id, method: 'post' })
 }
+
+/** AI模型可用性状态 */
+export interface ModelStatus {
+  totalModels: number
+  activeModels: number
+  scenes: Record<string, boolean>
+  modelNames: Record<string, string>
+}
+
+export function getModelStatus(): Promise<AjaxResult<ModelStatus>> {
+  return request({ url: '/news/model/status', method: 'get' })
+}

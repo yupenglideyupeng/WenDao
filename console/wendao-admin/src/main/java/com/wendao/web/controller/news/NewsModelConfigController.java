@@ -5,6 +5,8 @@ import com.wendao.common.core.controller.BaseController;
 import com.wendao.common.core.domain.AjaxResult;
 import com.wendao.common.core.page.TableDataInfo;
 import com.wendao.common.enums.BusinessType;
+import com.wendao.system.cache.ModelConfigCache;
+import com.wendao.system.cache.ModelStatus;
 import com.wendao.system.domain.NewsModelConfig;
 import com.wendao.system.service.INewsModelConfigService;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -32,6 +34,20 @@ public class NewsModelConfigController extends BaseController
 {
     @Autowired
     private INewsModelConfigService modelConfigService;
+
+    @Autowired
+    private ModelConfigCache modelConfigCache;
+
+    /**
+     * AI 模型可用性状态（供前端判断各场景是否可用）
+     */
+    @PreAuthorize("@ss.hasPermi('news:model:query')")
+    @GetMapping("/status")
+    public AjaxResult status()
+    {
+        ModelStatus status = modelConfigCache.getModelStatus();
+        return success(status);
+    }
 
     /**
      * 分页列表
