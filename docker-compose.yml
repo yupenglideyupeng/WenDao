@@ -126,8 +126,8 @@ services:
     volumes:
       - upload-data:/home/wendao/uploadPath
       - log-data:/home/wendao/logs
-      # JAR 包从宿主机挂载（本地打包后上传）
-      - ./wendao-admin.jar:/app/wendao-admin.jar
+      # JAR 包从 /opt/data/console 挂载（本地打包后上传到此处）
+      - /opt/data/console/wendao-admin.jar:/app/wendao-admin.jar
     healthcheck:
       test: ["CMD-SHELL", "curl -f -s http://localhost:8080/captchaImage > /dev/null || exit 1"]
       interval: 30s
@@ -153,8 +153,8 @@ services:
     ports:
       - "3000:80"
     volumes:
-      # 前端静态文件从宿主机挂载（本地构建后上传）
-      - ./ui/dist:/usr/share/nginx/html:ro
+      # 前端静态文件从 /opt/data/ui 挂载（本地构建后上传到此处）
+      - /opt/data/ui/dist:/usr/share/nginx/html:ro
     networks:
       - wendao-net
 

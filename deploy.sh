@@ -68,23 +68,23 @@ echo "[OK] .env.docker loaded"
 echo ""
 
 # ---- Step 2: Check required artifacts ----
-if [ ! -f wendao-admin.jar ]; then
-    echo "[ERROR] wendao-admin.jar not found!"
-    echo "  Please build locally and upload:"
+if [ ! -f /opt/data/console/wendao-admin.jar ]; then
+    echo "[ERROR] /opt/data/console/wendao-admin.jar not found!"
+    echo "  Build locally and upload:"
     echo "    cd console && mvn clean package -Dmaven.test.skip=true"
-    echo "    scp wendao-admin/target/wendao-admin.jar root@<server>:/opt/WenDao/"
+    echo "    scp wendao-admin/target/wendao-admin.jar root@<server>:/opt/data/console/"
     exit 1
 fi
-echo "[OK] wendao-admin.jar found"
+echo "[OK] /opt/data/console/wendao-admin.jar found"
 
-if [ ! -d ui/dist ] || [ ! -f ui/dist/index.html ]; then
-    echo "[ERROR] ui/dist/ not found!"
-    echo "  Please build locally and upload:"
+if [ ! -d /opt/data/ui/dist ] || [ ! -f /opt/data/ui/dist/index.html ]; then
+    echo "[ERROR] /opt/data/ui/dist/ not found!"
+    echo "  Build locally and upload:"
     echo "    cd ui && npm run build:prod"
-    echo "    scp -r dist/ root@<server>:/opt/WenDao/ui/"
+    echo "    scp -r dist/ root@<server>:/opt/data/ui/"
     exit 1
 fi
-echo "[OK] ui/dist/ found"
+echo "[OK] /opt/data/ui/dist/ found"
 echo ""
 
 # ---- Step 3: Create directories and copy SQL ----
