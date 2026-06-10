@@ -1,8 +1,14 @@
 #!/bin/bash
 # ============================================================
-# WenDao — One-Click Deployment Script
+# WenDao — One-Click Deployment Script (预构建模式)
 # ============================================================
-# Run this on the CentOS server to deploy everything.
+# 本地打包 JAR + dist，上传到服务器后运行此脚本。
+# Docker 只跑运行时，不在服务器上编译/构建。
+#
+# 前置条件：
+#   1. 本地执行 mvn clean package 得到 wendao-admin.jar
+#   2. 本地执行 npm run build:prod 得到 ui/dist/
+#   3. 将 jar 和 dist 上传到 /opt/WenDao/
 #
 # Usage:
 #   chmod +x deploy.sh
@@ -61,25 +67,41 @@ set +a
 echo "[OK] .env.docker loaded"
 echo ""
 
-# ---- Step 2: Create directories ----
-echo "[INFO] Creating directories..."
+# ---- Step 2: Check required artifacts ----
+if [ ! -f wendao-admin.jar ]; then
+    echo "[ERROR] wendao-admin.jar not found!"
+    echo "  Please build locally and upload:"
+    echo "    cd console && mvn clean package -Dmaven.test.skip=true"
+    echo "    scp wendao-admin/target/wendao-admin.jar root@<server>:/opt/WenDao/"
+    exit 1
+fi
+echo "[OK] wendao-admin.jar found"
+
+if [ ! -d ui/dist ] || [ ! -f ui/dist/index.html ]; then
+    echo "[ERROR] ui/dist/ not found!"
+    echo "  Please build locally and upload:"
+    echo "    cd ui && npm run build:prod"
+    echo "    scp -r dist/ root@<server>:/opt/WenDao/ui/"
+    exit 1
+fi
+echo "[OK] ui/dist/ found"
+echo ""
+
+# ---- Step 3: Create directories and copy SQL ----
+echo "[INFO] Preparing..."
 mkdir -p docker/mysql/init
 
-# Copy the SQL init file if not already present
 if [ ! -f docker/mysql/init/02-wendao.sql ]; then
     echo "[INFO] Copying database init SQL..."
     cp console/sql/wendao.sql docker/mysql/init/02-wendao.sql
 fi
 
-echo "[OK] Directories ready"
+echo "[OK] Ready"
 echo ""
 
-# ---- Step 3: Build and start ----
+# ---- Step 4: Build images and start ----
 echo "[INFO] Building Docker images..."
-echo "  This may take 5-15 minutes on first run..."
-echo ""
-
-docker compose build --no-cache backend frontend
+docker compose build backend frontend
 
 echo ""
 echo "[INFO] Starting all services..."
@@ -87,14 +109,11 @@ docker compose up -d
 
 echo ""
 echo "============================================"
-echo "  Deployment in progress..."
+echo "  Waiting for services to be healthy..."
 echo "============================================"
 echo ""
-echo "  Waiting for services to be healthy..."
-echo "  (this may take 1-2 minutes)"
-echo ""
 
-# ---- Step 4: Wait for healthy ----
+# ---- Step 5: Wait for healthy ----
 MAX_WAIT=180
 WAITED=0
 while [ $WAITED -lt $MAX_WAIT ]; do
@@ -118,7 +137,7 @@ if [ $WAITED -ge $MAX_WAIT ]; then
     echo "  Check status: docker compose ps"
 fi
 
-# ---- Step 5: Print summary ----
+# ---- Step 6: Print summary ----
 echo ""
 echo "============================================"
 echo "  Deployment Summary"
@@ -127,17 +146,14 @@ echo ""
 docker compose ps
 echo ""
 echo "  Access URL:"
-echo "    Frontend:  http://$(curl -s ifconfig.me 2>/dev/null || echo '<server-ip>'):3000"
+echo "    http://$(curl -s ifconfig.me 2>/dev/null || echo '<server-ip>'):3000"
 echo ""
 echo "  Default login: admin / admin123"
 echo ""
 echo "  Useful commands:"
 echo "    docker compose ps              # Check service status"
 echo "    docker compose logs -f backend # View backend logs"
-echo "    docker compose logs -f frontend# View nginx logs"
 echo "    docker compose restart backend # Restart backend"
-echo ""
-echo "  Note: Swagger and Druid are disabled by default in production."
-echo "  To enable, set SWAGGER_ENABLED=true or DRUID_STAT_ENABLED=true in .env.docker"
+echo "    docker compose restart frontend# Restart nginx"
 echo ""
 echo "============================================"

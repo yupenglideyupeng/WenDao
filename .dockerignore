@@ -16,13 +16,12 @@ console/**/target/
 console/**/*.class
 console/**/*.jar
 console/**/*.log
+wendao-admin.jar
 
 # ---- Frontend build artifacts ----
 ui/node_modules/
 ui/dist/
 ui/.vite/
-
-# ---- OS ----
 .DS_Store
 Thumbs.db
 

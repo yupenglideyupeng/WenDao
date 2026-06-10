@@ -90,8 +90,8 @@ services:
       # Server
       SERVER_PORT: "8080"
 
-      # JVM Options
-      JAVA_OPTS: "-Xms512m -Xmx1024m -XX:MetaspaceSize=128m -XX:MaxMetaspaceSize=512m -Duser.timezone=Asia/Shanghai -Dlogging.config=/app/config/logback-docker.xml"
+      # JVM Options (small server friendly)
+      JAVA_OPTS: "-Xms256m -Xmx512m -XX:MetaspaceSize=128m -XX:MaxMetaspaceSize=256m -Duser.timezone=Asia/Shanghai -Dlogging.config=/app/config/logback-docker.xml"
 
       # ============================================================
       # Production Security Settings
@@ -126,12 +126,14 @@ services:
     volumes:
       - upload-data:/home/wendao/uploadPath
       - log-data:/home/wendao/logs
+      # JAR 包从宿主机挂载（本地打包后上传）
+      - ./wendao-admin.jar:/app/wendao-admin.jar
     healthcheck:
       test: ["CMD-SHELL", "curl -f -s http://localhost:8080/captchaImage > /dev/null || exit 1"]
       interval: 30s
       timeout: 10s
       retries: 5
-      start_period: 90s
+      start_period: 60s
     networks:
       - wendao-net
 
@@ -150,6 +152,9 @@ services:
         condition: service_healthy
     ports:
       - "3000:80"
+    volumes:
+      # 前端静态文件从宿主机挂载（本地构建后上传）
+      - ./ui/dist:/usr/share/nginx/html:ro
     networks:
       - wendao-net
 
