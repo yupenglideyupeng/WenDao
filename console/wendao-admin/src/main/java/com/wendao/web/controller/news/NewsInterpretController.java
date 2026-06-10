@@ -158,6 +158,7 @@ public class NewsInterpretController extends BaseController
             }
 
             // 3. 如果上一条记录仍在进行中，标记为已取消
+            NewsInterpretation latest = interpretationService.selectLatestByArticleId(articleId);
             if (latest != null && "0".equals(latest.getStatus()))
             {
                 markFailed(latest, "用户重新发起解读，本次已取消");
