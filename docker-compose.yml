@@ -108,7 +108,6 @@ services:
         {
           "wendao.profile": "${WENDAO_PROFILE:-/home/wendao/uploadPath}",
           "wendao.aes-key": "${WENDAO_AES_KEY}",
-          "news.ai.api-key": "${NEWS_AI_API_KEY}",
           "news.ai.enabled": true,
           "token.secret": "${TOKEN_SECRET}",
           "token.expireTime": ${TOKEN_EXPIRE_TIME:-30},

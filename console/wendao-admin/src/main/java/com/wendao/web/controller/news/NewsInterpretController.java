@@ -10,9 +10,11 @@ import com.wendao.common.core.domain.model.LoginUser;
 import com.wendao.common.enums.BusinessType;
 import com.wendao.common.utils.StringUtils;
 import com.wendao.framework.web.service.TokenService;
+import com.wendao.system.cache.ModelConfigCache;
 import com.wendao.system.config.NewsAiProperties;
 import com.wendao.system.domain.NewsArticle;
 import com.wendao.system.domain.NewsInterpretation;
+import com.wendao.system.domain.NewsModelConfig;
 import com.wendao.system.domain.NewsPromptConfig;
 import com.wendao.system.service.INewsArticleService;
 import com.wendao.system.service.INewsInterpretationService;
@@ -73,6 +75,9 @@ public class NewsInterpretController extends BaseController
 
     @Autowired
     private NewsAiProperties aiProperties;
+
+    @Autowired
+    private ModelConfigCache modelConfigCache;
 
     @Autowired
     private TokenService tokenService;
@@ -144,48 +149,57 @@ public class NewsInterpretController extends BaseController
                 return;
             }
 
-            // 2. 如果上一条记录仍在进行中，标记为已取消（前端重新解读时断开连接导致）
-            NewsInterpretation latest = interpretationService.selectLatestByArticleId(articleId);
+            // 2. 从缓存获取模型配置（按优先级选第一个 INTERPRET 类型）
+            NewsModelConfig modelConfig = modelConfigCache.getModelConfig(PROMPT_TYPE_INTERPRET);
+            if (modelConfig == null || StringUtils.isEmpty(modelConfig.getApiKey()))
+            {
+                writeError(outputStream, "无可用AI模型配置，请在模型管理中配置 INTERPRET 类型的模型");
+                return;
+            }
+
+            // 3. 如果上一条记录仍在进行中，标记为已取消
             if (latest != null && "0".equals(latest.getStatus()))
             {
                 markFailed(latest, "用户重新发起解读，本次已取消");
             }
 
-            // 3. 查找匹配的提示词配置
+            // 4. 查找匹配的提示词配置
             NewsPromptConfig promptCfg = findPromptConfig(article);
             String systemPrompt = promptCfg != null && StringUtils.isNotEmpty(promptCfg.getSystemPrompt())
                     ? promptCfg.getSystemPrompt()
                     : FALLBACK_INTERPRET_PROMPT;
 
-            // 4. 创建解读记录（status=0 进行中）
+            // 5. 创建解读记录（status=0 进行中）
             record = new NewsInterpretation();
             record.setArticleId(articleId);
             record.setPromptConfigId(promptCfg != null ? promptCfg.getId() : null);
             record.setPromptSnapshot(systemPrompt);
             record.setStatus("0");
-            record.setModelName(aiProperties.getModel());
+            record.setModelName(modelConfig.getModelName());
             record.setInterpretCount(latest != null ? latest.getInterpretCount() + 1 : 1);
             record.setCreateBy(username);
             interpretationService.insert(record);
 
-            // 5. 通知前端：解读开始，返回 recordId（自定义事件，非 DeepSeek 流式内容）
+            // 6. 通知前端：解读开始
             JSONObject startData = new JSONObject();
             startData.put("recordId", record.getId());
             startData.put("interpretCount", record.getInterpretCount());
+            startData.put("modelName", modelConfig.getModelName());
             writeEvent(outputStream, "start", startData.toJSONString());
 
-            // 6. 构建 DeepSeek 流式请求体
-            String requestBodyJson = buildRequestBody(article, systemPrompt, promptCfg).toJSONString();
+            // 7. 构建流式请求体（使用模型配置的参数）
+            String requestBodyJson = buildRequestBody(article, systemPrompt, promptCfg, modelConfig).toJSONString();
 
-            // 7. 建立 HttpURLConnection 连接（stream: true）
-            URL url = new URL(aiProperties.getApiUrl());
+            // 8. 建立 HttpURLConnection 连接
+            URL url = new URL(modelConfig.getApiUrl());
+            int timeout = modelConfig.getTimeoutMs() != null ? modelConfig.getTimeoutMs() : 30000;
             connection = (HttpURLConnection) url.openConnection();
             connection.setRequestMethod("POST");
             connection.setDoOutput(true);
-            connection.setConnectTimeout(30_000);
+            connection.setConnectTimeout(timeout);
             connection.setReadTimeout(180_000);
             connection.setRequestProperty("Content-Type", "application/json;charset=UTF-8");
-            connection.setRequestProperty("Authorization", "Bearer " + aiProperties.getApiKey());
+            connection.setRequestProperty("Authorization", "Bearer " + modelConfig.getApiKey());
 
             // 写入请求体
             try (OutputStream reqOut = connection.getOutputStream())
@@ -271,7 +285,7 @@ public class NewsInterpretController extends BaseController
 
             // 11. 通知前端完成（自定义 done 事件）
             JSONObject doneData = new JSONObject();
-            doneData.put("modelName", aiProperties.getModel());
+            doneData.put("modelName", modelConfig.getModelName());
             writeEvent(outputStream, "done", doneData.toJSONString());
             outputStream.flush();
         }
@@ -297,7 +311,7 @@ public class NewsInterpretController extends BaseController
     /**
      * 构建 DeepSeek 请求体（stream: true）
      */
-    private JSONObject buildRequestBody(NewsArticle article, String systemPrompt, NewsPromptConfig promptCfg)
+    private JSONObject buildRequestBody(NewsArticle article, String systemPrompt, NewsPromptConfig promptCfg, NewsModelConfig modelConfig)
     {
         double temperature = 0.5;
         int maxTokens = 2000;
@@ -306,9 +320,12 @@ public class NewsInterpretController extends BaseController
             if (promptCfg.getTemperature() != null) temperature = promptCfg.getTemperature();
             if (promptCfg.getMaxTokens() != null) maxTokens = promptCfg.getMaxTokens();
         }
+        // 模型配置覆盖（如果提示词未指定）
+        if (promptCfg == null && modelConfig.getTemperature() != null) temperature = modelConfig.getTemperature().doubleValue();
+        if (promptCfg == null && modelConfig.getMaxTokens() != null) maxTokens = modelConfig.getMaxTokens();
 
         JSONObject body = new JSONObject();
-        body.put("model", aiProperties.getModel());
+        body.put("model", modelConfig.getModelName());
         body.put("temperature", temperature);
         body.put("max_tokens", maxTokens);
         body.put("stream", true);   // 真流式

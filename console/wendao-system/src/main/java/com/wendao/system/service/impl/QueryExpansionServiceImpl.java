@@ -14,14 +14,15 @@ import org.springframework.web.client.RestTemplate;
 import com.alibaba.fastjson2.JSON;
 import com.alibaba.fastjson2.JSONArray;
 import com.wendao.common.utils.StringUtils;
-import com.wendao.system.config.NewsAiProperties;
+import com.wendao.system.cache.ModelConfigCache;
 import com.wendao.system.config.NewsFetchProperties;
+import com.wendao.system.domain.NewsModelConfig;
 import com.wendao.system.domain.NewsQueryExpansion;
 import com.wendao.system.mapper.NewsQueryExpansionMapper;
 import com.wendao.system.service.IQueryExpansionService;
 
 /**
- * 查询扩展 服务层实现
+ * 查询扩展 服务层实现（模型从DB模型配置表按优先级选取，API Key AES加解密）
  *
  * @author wendao
  */
@@ -34,18 +35,20 @@ public class QueryExpansionServiceImpl implements IQueryExpansionService
     private NewsFetchProperties fetchProperties;
 
     @Autowired
-    private NewsAiProperties aiProperties;
+    private ModelConfigCache modelConfigCache;
 
     @Autowired
     private NewsQueryExpansionMapper expansionMapper;
 
     private final RestTemplate restTemplate = new RestTemplate();
 
+    private static final String USAGE_TYPE = "EXPANSION";
+
     @Override
     public List<String> expand(String keyword, Long keywordId)
     {
         List<String> result = new ArrayList<>();
-        result.add(keyword); // 始终包含原始词
+        result.add(keyword);
 
         if (!fetchProperties.getQueryExpansion().isEnabled())
         {
@@ -60,26 +63,33 @@ public class QueryExpansionServiceImpl implements IQueryExpansionService
         {
             for (NewsQueryExpansion exp : cached)
             {
-                if (result.size() >= maxTerms + 1) break; // +1 因为包含原始词
+                if (result.size() >= maxTerms + 1) break;
                 result.add(exp.getExpandedTerm());
             }
             return result;
         }
 
-        // 2. 无缓存，调用AI生成扩展词
-        List<String> expanded = generateExpansions(keyword);
+        // 2. 从模型配置缓存获取模型
+        NewsModelConfig modelConfig = modelConfigCache.getModelConfig(USAGE_TYPE);
+        if (modelConfig == null || StringUtils.isEmpty(modelConfig.getApiKey()))
+        {
+            log.debug("无可用AI模型配置（usageType={}），跳过查询扩展", USAGE_TYPE);
+            return result;
+        }
+
+        // 3. 调用AI生成扩展词
+        List<String> expanded = generateExpansions(keyword, modelConfig);
         if (expanded.isEmpty())
         {
             return result;
         }
 
-        // 3. 持久化并返回
+        // 4. 持久化并返回
         for (String term : expanded)
         {
             if (result.size() >= maxTerms + 1) break;
             result.add(term);
 
-            // 保存到DB
             try
             {
                 NewsQueryExpansion exp = new NewsQueryExpansion();
@@ -99,16 +109,11 @@ public class QueryExpansionServiceImpl implements IQueryExpansionService
     }
 
     /**
-     * 调用DeepSeek API生成同义词/相关词
+     * 调用AI API生成同义词/相关词
      */
-    private List<String> generateExpansions(String keyword)
+    private List<String> generateExpansions(String keyword, NewsModelConfig modelConfig)
     {
         List<String> expansions = new ArrayList<>();
-
-        if (!aiProperties.isEnabled() || StringUtils.isEmpty(aiProperties.getApiKey()))
-        {
-            return expansions;
-        }
 
         try
         {
@@ -117,7 +122,7 @@ public class QueryExpansionServiceImpl implements IQueryExpansionService
                     + "仅返回JSON数组，不要其他内容。";
 
             com.alibaba.fastjson2.JSONObject body = new com.alibaba.fastjson2.JSONObject();
-            body.put("model", aiProperties.getModel());
+            body.put("model", modelConfig.getModelName());
             body.put("temperature", 0.3);
             body.put("max_tokens", 100);
             body.put("stream", false);
@@ -135,13 +140,19 @@ public class QueryExpansionServiceImpl implements IQueryExpansionService
 
             body.put("messages", messages);
 
+            int timeout = modelConfig.getTimeoutMs() != null ? modelConfig.getTimeoutMs() : 10000;
+            restTemplate.setRequestFactory(new org.springframework.http.client.SimpleClientHttpRequestFactory() {{
+                setConnectTimeout(timeout);
+                setReadTimeout(timeout);
+            }});
+
             HttpHeaders headers = new HttpHeaders();
             headers.setContentType(MediaType.APPLICATION_JSON);
-            headers.set("Authorization", "Bearer " + aiProperties.getApiKey());
+            headers.set("Authorization", "Bearer " + modelConfig.getApiKey());
 
             HttpEntity<String> entity = new HttpEntity<>(body.toJSONString(), headers);
             ResponseEntity<String> response = restTemplate.postForEntity(
-                    aiProperties.getApiUrl(), entity, String.class);
+                    modelConfig.getApiUrl(), entity, String.class);
 
             if (!response.getStatusCode().is2xxSuccessful())
             {
@@ -173,7 +184,7 @@ public class QueryExpansionServiceImpl implements IQueryExpansionService
                 }
             }
 
-            log.info("查询扩展完成，关键词 [{}] → {}", keyword, expansions);
+            log.info("查询扩展完成，模型: {}，关键词 [{}] → {}", modelConfig.getModelName(), keyword, expansions);
         }
         catch (Exception e)
         {

@@ -35,6 +35,9 @@ public class NewsModelConfigServiceImpl implements INewsModelConfigService
     @Autowired
     private NewsModelConfigMapper mapper;
 
+    @Autowired
+    private com.wendao.system.cache.ModelConfigCache modelConfigCache;
+
     private final RestTemplate restTemplate = new RestTemplate();
 
     @Override
@@ -79,7 +82,10 @@ public class NewsModelConfigServiceImpl implements INewsModelConfigService
                 config.setApiKey(encrypted);
             }
         }
-        return mapper.insert(config);
+        int rows = mapper.insert(config);
+        // 失效缓存
+        if (rows > 0) modelConfigCache.evictAllCache();
+        return rows;
     }
 
     @Override
@@ -107,13 +113,19 @@ public class NewsModelConfigServiceImpl implements INewsModelConfigService
                 }
             }
         }
-        return mapper.update(config);
+        int rows = mapper.update(config);
+        // 失效缓存
+        if (rows > 0) modelConfigCache.evictAllCache();
+        return rows;
     }
 
     @Override
     public int deleteByIds(Long[] ids)
     {
-        return mapper.deleteByIds(ids);
+        int rows = mapper.deleteByIds(ids);
+        // 失效缓存
+        if (rows > 0) modelConfigCache.evictAllCache();
+        return rows;
     }
 
     @Override

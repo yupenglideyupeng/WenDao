@@ -16,8 +16,10 @@ import com.alibaba.fastjson2.JSON;
 import com.alibaba.fastjson2.JSONArray;
 import com.alibaba.fastjson2.JSONObject;
 import com.wendao.common.utils.StringUtils;
+import com.wendao.system.cache.ModelConfigCache;
 import com.wendao.system.config.NewsAiProperties;
 import com.wendao.system.domain.NewsArticle;
+import com.wendao.system.domain.NewsModelConfig;
 import com.wendao.system.domain.NewsPromptConfig;
 import com.wendao.system.domain.NewsTypeConfig;
 import com.wendao.system.service.INewsAiAnalysisService;
@@ -26,7 +28,7 @@ import com.wendao.system.service.INewsPromptConfigService;
 import com.wendao.system.service.INewsTypeConfigService;
 
 /**
- * AI新闻分析 服务层实现（提示词从DB读取，AI自动分类）
+ * AI新闻分析 服务层实现（模型从DB模型配置表按优先级选取，API Key AES加解密）
  *
  * @author wendao
  */
@@ -39,6 +41,9 @@ public class NewsAiAnalysisServiceImpl implements INewsAiAnalysisService
     private NewsAiProperties properties;
 
     @Autowired
+    private ModelConfigCache modelConfigCache;
+
+    @Autowired
     private INewsArticleService newsArticleService;
 
     @Autowired
@@ -48,6 +53,9 @@ public class NewsAiAnalysisServiceImpl implements INewsAiAnalysisService
     private INewsTypeConfigService typeConfigService;
 
     private final RestTemplate restTemplate = new RestTemplate();
+
+    /** AI分析场景标识 */
+    private static final String USAGE_TYPE = "ANALYSIS";
 
     /** 兜底基础提示词（DB未配置时使用） */
     private static final String FALLBACK_BASIC_PROMPT =
@@ -63,32 +71,41 @@ public class NewsAiAnalysisServiceImpl implements INewsAiAnalysisService
     @Override
     public void analyzeAsync(NewsArticle article)
     {
-        doAnalyze(article, null, "ANALYSIS", 0);
+        doAnalyze(article, null, 0);
     }
 
     @Async("aiAnalysisExecutor")
     @Override
     public void analyzeDeepAsync(NewsArticle article, String keyword)
     {
-        doAnalyze(article, keyword, "ANALYSIS", 0);
+        doAnalyze(article, keyword, 0);
     }
 
     @Async("aiAnalysisExecutor")
     @Override
     public void analyzeDeepAsync(NewsArticle article, String keyword, int relevanceThreshold)
     {
-        doAnalyze(article, keyword, "ANALYSIS", relevanceThreshold);
+        doAnalyze(article, keyword, relevanceThreshold);
     }
 
-    private void doAnalyze(NewsArticle article, String keyword, String promptType, int relevanceThreshold)
+    private void doAnalyze(NewsArticle article, String keyword, int relevanceThreshold)
     {
-        if (!properties.isEnabled() || StringUtils.isEmpty(properties.getApiKey()))
+        // 主开关
+        if (!properties.isEnabled())
         {
-            log.debug("AI分析未启用或未配置API Key，跳过文章 [{}]", article.getTitle());
+            log.debug("AI分析未启用，跳过文章 [{}]", article.getTitle());
             return;
         }
 
-        // 检查数据库中是否有启用的新闻类型，没有则不进行分析
+        // 从缓存获取模型配置（按优先级选第一个）
+        NewsModelConfig modelConfig = modelConfigCache.getModelConfig(USAGE_TYPE);
+        if (modelConfig == null || StringUtils.isEmpty(modelConfig.getApiKey()))
+        {
+            log.debug("无可用AI模型配置，跳过AI分析 [{}]", article.getTitle());
+            return;
+        }
+
+        // 检查数据库中是否有启用的新闻类型
         List<NewsTypeConfig> activeTypes = typeConfigService.selectActive();
         if (activeTypes.isEmpty())
         {
@@ -99,22 +116,28 @@ public class NewsAiAnalysisServiceImpl implements INewsAiAnalysisService
         try
         {
             // 从DB查找匹配的提示词配置
-            NewsPromptConfig promptCfg = findPromptConfig(article, promptType);
+            NewsPromptConfig promptCfg = findPromptConfig(article, USAGE_TYPE);
 
-            JSONObject requestBody = buildRequestBody(article, keyword, promptCfg, activeTypes, relevanceThreshold);
+            JSONObject requestBody = buildRequestBody(article, keyword, promptCfg, activeTypes, relevanceThreshold, modelConfig);
 
             HttpHeaders headers = new HttpHeaders();
             headers.setContentType(MediaType.APPLICATION_JSON);
-            headers.set("Authorization", "Bearer " + properties.getApiKey());
+            headers.set("Authorization", "Bearer " + modelConfig.getApiKey());
+
+            int timeout = modelConfig.getTimeoutMs() != null ? modelConfig.getTimeoutMs() : 30000;
+            restTemplate.setRequestFactory(new org.springframework.http.client.SimpleClientHttpRequestFactory() {{
+                setConnectTimeout(timeout);
+                setReadTimeout(timeout);
+            }});
 
             HttpEntity<String> entity = new HttpEntity<>(requestBody.toJSONString(), headers);
             ResponseEntity<String> response = restTemplate.postForEntity(
-                    properties.getApiUrl(), entity, String.class);
+                    modelConfig.getApiUrl(), entity, String.class);
 
             if (!response.getStatusCode().is2xxSuccessful())
             {
-                log.error("AI分析请求失败，状态码: {}，文章: {}",
-                        response.getStatusCode().value(), article.getTitle());
+                log.error("AI分析请求失败，状态码: {}，模型: {}，文章: {}",
+                        response.getStatusCode().value(), modelConfig.getModelName(), article.getTitle());
                 return;
             }
 
@@ -122,17 +145,17 @@ public class NewsAiAnalysisServiceImpl implements INewsAiAnalysisService
             JSONArray choices = respJson.getJSONArray("choices");
             if (choices == null || choices.isEmpty())
             {
-                log.warn("AI分析返回空choices，文章: {}", article.getTitle());
+                log.warn("AI分析返回空choices，模型: {}，文章: {}", modelConfig.getModelName(), article.getTitle());
                 return;
             }
 
             String aiContent = choices.getJSONObject(0).getJSONObject("message").getString("content");
-            boolean isDeep = ("ANALYSIS".equals(promptType) && keyword != null) || relevanceThreshold > 0;
+            boolean isDeep = keyword != null || relevanceThreshold > 0;
             parseAiResult(article, aiContent, isDeep, relevanceThreshold);
 
             newsArticleService.updateArticle(article);
-            log.info("AI分析完成，文章 [{}] typeConfigId={} sentiment={}",
-                    article.getTitle(), article.getTypeConfigId(), article.getSentiment());
+            log.info("AI分析完成，模型: {}，文章 [{}] typeConfigId={} sentiment={}",
+                    modelConfig.getModelName(), article.getTitle(), article.getTypeConfigId(), article.getSentiment());
         }
         catch (Exception e)
         {
@@ -146,41 +169,32 @@ public class NewsAiAnalysisServiceImpl implements INewsAiAnalysisService
      */
     private NewsPromptConfig findPromptConfig(NewsArticle article, String promptType)
     {
-        // 1. 精确匹配：文章类型 + promptType
         if (article.getTypeConfigId() != null)
         {
             NewsPromptConfig cfg = promptConfigService.selectMatch(article.getTypeConfigId(), promptType);
             if (cfg != null)
             {
-                log.debug("精确匹配提示词 typeConfigId={} promptType={}", article.getTypeConfigId(), promptType);
                 return cfg;
             }
         }
-        // 2. 降级：只按 promptType 查找
-        NewsPromptConfig cfg = promptConfigService.selectMatch(null, promptType);
-        if (cfg != null)
-        {
-            log.debug("降级匹配提示词 promptType={}", promptType);
-        }
-        return cfg;
+        return promptConfigService.selectMatch(null, promptType);
     }
 
     /**
-     * 构建DeepSeek API请求体
+     * 构建AI API请求体
      */
-    private JSONObject buildRequestBody(NewsArticle article, String keyword, NewsPromptConfig promptCfg, List<NewsTypeConfig> activeTypes, int relevanceThreshold)
+    private JSONObject buildRequestBody(NewsArticle article, String keyword, NewsPromptConfig promptCfg,
+                                         List<NewsTypeConfig> activeTypes, int relevanceThreshold,
+                                         NewsModelConfig modelConfig)
     {
         JSONObject body = new JSONObject();
 
-        // 模型统一使用后端配置
-        String model = properties.getModel();
-        double temperature = 0.3;
-        // 关键词驱动 或 来源深度分析(relevanceThreshold>0) 使用深度提示词
         boolean useDeep = keyword != null || relevanceThreshold > 0;
-        // 深度分析字段多，给400；基础分析300即可，token越少越不容易跑偏
         int maxTokens = useDeep ? 400 : 300;
+        double temperature = 0.3;
         String systemPrompt = useDeep ? FALLBACK_DEEP_PROMPT : FALLBACK_BASIC_PROMPT;
 
+        // 提示词配置覆盖默认值
         if (promptCfg != null)
         {
             if (promptCfg.getTemperature() != null) temperature = promptCfg.getTemperature();
@@ -188,21 +202,30 @@ public class NewsAiAnalysisServiceImpl implements INewsAiAnalysisService
             if (StringUtils.isNotEmpty(promptCfg.getSystemPrompt())) systemPrompt = promptCfg.getSystemPrompt();
         }
 
-        // 把可用新闻类型列表注入 system_prompt，让AI自动分类
+        // 模型配置覆盖 maxTokens / temperature（优先用模型默认值）
+        if (modelConfig.getMaxTokens() != null && promptCfg == null) maxTokens = modelConfig.getMaxTokens();
+        if (modelConfig.getTemperature() != null && promptCfg == null)
+            temperature = modelConfig.getTemperature().doubleValue();
+
+        // 注入可用新闻类型列表
         String typeHint = buildTypeHint(activeTypes);
         if (StringUtils.isNotEmpty(typeHint))
         {
             systemPrompt = systemPrompt + "\n\n" + typeHint;
         }
 
-        body.put("model", model);
+        body.put("model", modelConfig.getModelName());
         body.put("temperature", temperature);
         body.put("max_tokens", maxTokens);
         body.put("stream", false);
-        // 强制模型返回JSON格式，避免生成markdown或其他非JSON文本
-        JSONObject responseFormat = new JSONObject();
-        responseFormat.put("type", "json_object");
-        body.put("response_format", responseFormat);
+
+        // JSON 结构化输出（如果模型支持）
+        if (modelConfig.getSupportJsonMode() != null && modelConfig.getSupportJsonMode() == 1)
+        {
+            JSONObject responseFormat = new JSONObject();
+            responseFormat.put("type", "json_object");
+            body.put("response_format", responseFormat);
+        }
 
         JSONArray messages = new JSONArray();
         JSONObject sysMsg = new JSONObject();
@@ -277,7 +300,6 @@ public class NewsAiAnalysisServiceImpl implements INewsAiAnalysisService
         {
             JSONObject result = JSON.parseObject(jsonStr);
 
-            // === 基础字段 ===
             article.setSummary(result.getString("summary"));
             article.setSentiment(result.getString("sentiment"));
 
@@ -287,7 +309,7 @@ public class NewsAiAnalysisServiceImpl implements INewsAiAnalysisService
 
             article.setKeywords(result.getString("keywords"));
 
-            // === AI自动分类：typeCode → typeConfigId ===
+            // AI自动分类
             String typeCode = result.getString("typeCode");
             if (StringUtils.isNotEmpty(typeCode))
             {
@@ -295,16 +317,10 @@ public class NewsAiAnalysisServiceImpl implements INewsAiAnalysisService
                 if (typeConfig != null)
                 {
                     article.setTypeConfigId(typeConfig.getId());
-                    log.debug("AI自动分类：typeCode={} → typeConfigId={} ({})",
-                            typeCode, typeConfig.getId(), typeConfig.getTypeName());
-                }
-                else
-                {
-                    log.debug("AI返回的typeCode [{}] 未匹配到任何类型配置", typeCode);
                 }
             }
 
-            // === 深度分析字段 ===
+            // 深度分析字段
             if (deep)
             {
                 if (result.containsKey("isReal"))
@@ -317,13 +333,10 @@ public class NewsAiAnalysisServiceImpl implements INewsAiAnalysisService
                 String imp = result.getString("importance");
                 if (imp != null && imp.matches("low|medium|high|urgent")) article.setImportance(imp);
 
-                // 相关性阈值过滤：低于阈值的文章自动下架
                 if (relevanceThreshold > 0 && article.getRelevance() != null
                         && article.getRelevance() < relevanceThreshold)
                 {
                     article.setStatus("1");
-                    log.info("文章 [{}] 相关性评分 {} 低于阈值 {}，自动下架",
-                            article.getTitle(), article.getRelevance(), relevanceThreshold);
                 }
             }
         }
@@ -335,47 +348,28 @@ public class NewsAiAnalysisServiceImpl implements INewsAiAnalysisService
 
     /**
      * 从AI返回内容中提取JSON字符串
-     * 支持：纯JSON、```json```代码块包裹、混合文本中嵌入的JSON对象
-     * 使用大括号匹配确保提取完整的JSON对象
      */
     private String extractJson(String content)
     {
-        if (StringUtils.isEmpty(content))
-        {
-            return null;
-        }
+        if (StringUtils.isEmpty(content)) return null;
         String trimmed = content.trim();
 
-        // 情况1：以{开头，尝试直接解析
         if (trimmed.startsWith("{"))
         {
-            try
-            {
-                JSON.parseObject(trimmed);
-                return trimmed;
-            }
-            catch (Exception ignored)
-            {
-                // 可能末尾有多余内容，走大括号匹配
-            }
+            try { JSON.parseObject(trimmed); return trimmed; }
+            catch (Exception ignored) {}
         }
 
-        // 情况2：```json ... ``` 代码块
         if (trimmed.contains("```"))
         {
             String stripped = trimmed.replaceAll("```json\\s*", "").replaceAll("```\\s*", "").trim();
             if (stripped.startsWith("{"))
             {
-                try
-                {
-                    JSON.parseObject(stripped);
-                    return stripped;
-                }
+                try { JSON.parseObject(stripped); return stripped; }
                 catch (Exception ignored) {}
             }
         }
 
-        // 情况3：在混合内容中查找第一个完整的 {...} 块（大括号匹配）
         int start = trimmed.indexOf('{');
         if (start >= 0)
         {
@@ -385,21 +379,9 @@ public class NewsAiAnalysisServiceImpl implements INewsAiAnalysisService
             for (int i = start; i < trimmed.length(); i++)
             {
                 char c = trimmed.charAt(i);
-                if (escaped)
-                {
-                    escaped = false;
-                    continue;
-                }
-                if (c == '\\' && inString)
-                {
-                    escaped = true;
-                    continue;
-                }
-                if (c == '"')
-                {
-                    inString = !inString;
-                    continue;
-                }
+                if (escaped) { escaped = false; continue; }
+                if (c == '\\' && inString) { escaped = true; continue; }
+                if (c == '"') { inString = !inString; continue; }
                 if (!inString)
                 {
                     if (c == '{') depth++;
@@ -409,15 +391,8 @@ public class NewsAiAnalysisServiceImpl implements INewsAiAnalysisService
                         if (depth == 0)
                         {
                             String candidate = trimmed.substring(start, i + 1);
-                            try
-                            {
-                                JSON.parseObject(candidate);
-                                return candidate;
-                            }
-                            catch (Exception ignored)
-                            {
-                                break;
-                            }
+                            try { JSON.parseObject(candidate); return candidate; }
+                            catch (Exception ignored) { break; }
                         }
                     }
                 }

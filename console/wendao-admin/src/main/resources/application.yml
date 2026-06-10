@@ -167,9 +167,9 @@ news:
     enabled: true
     # AI API地址（默认DeepSeek，国内直连）
     api-url: https://api.deepseek.com/v1/chat/completions
-    # AI API密钥（生产环境通过环境变量 NEWS_AI_API_KEY 注入）
-    api-key: ${NEWS_AI_API_KEY:}
-    # 模型名称
+    # 注意：API密钥和模型名称现由 news_model_config 表管理，此处不再需要
+    # 仅保留 enabled 作为AI功能总开关
+    # 模型名称（已废弃，由DB模型配置表管理）
     model: deepseek-chat
     # 超时时间(毫秒)
     timeout: 30000
