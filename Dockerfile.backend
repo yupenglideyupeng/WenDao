@@ -1,0 +1,64 @@
+# ============================================================
+# WenDao Backend — Multi-stage Docker Build
+# ============================================================
+# Build context: project root (WenDao/)
+# JDK 21 required (wendao-admin overrides root pom's Java 17)
+# ============================================================
+
+# ---- Stage 1: Maven Build ----
+FROM maven:3.9-eclipse-temurin-21-alpine AS build
+
+WORKDIR /build
+
+# Copy Maven POM files first for dependency caching
+COPY console/pom.xml ./console/
+COPY console/wendao-admin/pom.xml ./console/wendao-admin/
+COPY console/wendao-common/pom.xml ./console/wendao-common/
+COPY console/wendao-framework/pom.xml ./console/wendao-framework/
+COPY console/wendao-system/pom.xml ./console/wendao-system/
+COPY console/wendao-quartz/pom.xml ./console/wendao-quartz/
+COPY console/wendao-generator/pom.xml ./console/wendao-generator/
+
+# Download dependencies (cacheable layer — only invalidates when pom.xml changes)
+WORKDIR /build/console
+RUN mvn dependency:go-offline -Dmaven.test.skip=true -Djava.version=21 -B -q
+
+# Copy full source
+COPY console/ .
+
+# Build with JDK 21 override
+RUN mvn clean package -Dmaven.test.skip=true -Djava.version=21 -B -q
+
+# ---- Stage 2: Runtime ----
+FROM eclipse-temurin:21-jre-alpine AS runtime
+
+# Install curl for healthcheck
+RUN apk add --no-cache curl tzdata && \
+    cp /usr/share/zoneinfo/Asia/Shanghai /etc/localtime && \
+    echo "Asia/Shanghai" > /etc/timezone
+
+# Create non-root user
+RUN addgroup -S wendao && adduser -S wendao -G wendao
+
+# Create application directories
+RUN mkdir -p /home/wendao/uploadPath /home/wendao/logs /app/config && \
+    chown -R wendao:wendao /home/wendao /app
+
+# Copy built JAR
+COPY --from=build /build/console/wendao-admin/target/wendao-admin.jar /app/wendao-admin.jar
+
+# Copy Docker-specific logback config
+COPY docker/backend/logback-docker.xml /app/config/logback-docker.xml
+
+USER wendao
+WORKDIR /app
+
+EXPOSE 8080
+
+# JVM options: production defaults, can be overridden via JAVA_OPTS env
+ENV JAVA_OPTS="-Xms512m -Xmx1024m -XX:MetaspaceSize=128m -XX:MaxMetaspaceSize=512m -Dlogging.config=/app/config/logback-docker.xml"
+
+HEALTHCHECK --interval=30s --timeout=10s --retries=5 --start-period=90s \
+    CMD curl -f -s http://localhost:8080/swagger-ui.html || exit 1
+
+ENTRYPOINT ["sh", "-c", "java ${JAVA_OPTS} -jar /app/wendao-admin.jar"]

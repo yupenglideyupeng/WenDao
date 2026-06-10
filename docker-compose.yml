@@ -1,0 +1,179 @@
+version: '3.8'
+
+# ============================================================
+# WenDao Docker Compose — 4-service orchestration
+# ============================================================
+# Usage:
+#   1. cp .env.docker.example .env.docker && edit .env.docker
+#   2. docker compose up -d --build
+#   3. docker compose ps        (check status)
+#   4. docker compose logs -f   (view logs)
+# ============================================================
+
+services:
+  # ==========================================
+  # MySQL 8.0
+  # ==========================================
+  mysql:
+    image: mysql:8.0
+    container_name: wendao-mysql
+    restart: always
+    environment:
+      MYSQL_ROOT_PASSWORD: ${DB_PASSWORD:-root}
+      MYSQL_DATABASE: wendao
+      MYSQL_CHARSET: utf8mb4
+      MYSQL_COLLATION: utf8mb4_unicode_ci
+      TZ: Asia/Shanghai
+    ports:
+      - "3306:3306"                           # Remove in production for security
+    volumes:
+      - mysql-data:/var/lib/mysql
+      - ./docker/mysql/init:/docker-entrypoint-initdb.d:ro
+    command:
+      - --character-set-server=utf8mb4
+      - --collation-server=utf8mb4_unicode_ci
+      - --default-time-zone=+08:00
+      - --max_allowed_packet=64M
+      - --default-authentication-plugin=mysql_native_password
+    healthcheck:
+      test: ["CMD", "mysqladmin", "ping", "-h", "localhost", "-u", "root", "-p${DB_PASSWORD:-root}"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+      start_period: 60s
+    networks:
+      - wendao-net
+
+  # ==========================================
+  # Redis 7 (Alpine)
+  # ==========================================
+  redis:
+    image: redis:7-alpine
+    container_name: wendao-redis
+    restart: always
+    ports:
+      - "6379:6379"                           # Remove in production for security
+    volumes:
+      - redis-data:/data
+      - ./docker/redis/redis.conf:/usr/local/etc/redis/redis.conf:ro
+    command: redis-server /usr/local/etc/redis/redis.conf
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 10s
+    networks:
+      - wendao-net
+
+  # ==========================================
+  # Spring Boot Backend (JDK 21)
+  # ==========================================
+  backend:
+    build:
+      context: .
+      dockerfile: Dockerfile.backend
+    image: wendao-backend:${BACKEND_VERSION:-latest}
+    container_name: wendao-backend
+    restart: always
+    depends_on:
+      mysql:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    ports:
+      - "8080:8080"                           # Remove in production; frontend proxies internally
+    environment:
+      # Spring profile
+      SPRING_PROFILES_ACTIVE: druid
+
+      # Server
+      SERVER_PORT: "8080"
+
+      # JVM Options
+      JAVA_OPTS: "-Xms512m -Xmx1024m -XX:MetaspaceSize=128m -XX:MaxMetaspaceSize=512m -Duser.timezone=Asia/Shanghai -Dlogging.config=/app/config/logback-docker.xml"
+
+      # ============================================================
+      # Production Security Settings
+      # ============================================================
+      # Swagger UI: disabled in production (set "true" to enable)
+      SWAGGER_ENABLED: "${SWAGGER_ENABLED:-false}"
+      # Druid console: disabled in production (set "true" to enable)
+      DRUID_STAT_ENABLED: "${DRUID_STAT_ENABLED:-false}"
+      # Log level for com.wendao: info in production, debug for development
+      LOG_LEVEL_COM_WENDAO: "${LOG_LEVEL_COM_WENDAO:-info}"
+
+      # Override all hardcoded properties via SPRING_APPLICATION_JSON
+      SPRING_APPLICATION_JSON: >-
+        {
+          "wendao.profile": "${WENDAO_PROFILE:-/home/wendao/uploadPath}",
+          "wendao.aes-key": "${WENDAO_AES_KEY}",
+          "news.ai.api-key": "${NEWS_AI_API_KEY}",
+          "news.ai.enabled": true,
+          "token.secret": "${TOKEN_SECRET}",
+          "token.expireTime": ${TOKEN_EXPIRE_TIME:-30},
+          "spring.datasource.druid.master.url": "jdbc:mysql://mysql:3306/wendao?useUnicode=true&characterEncoding=utf8&zeroDateTimeBehavior=convertToNull&useSSL=false&serverTimezone=GMT%2B8&allowPublicKeyRetrieval=true",
+          "spring.datasource.druid.master.username": "${DB_USERNAME:-root}",
+          "spring.datasource.druid.master.password": "${DB_PASSWORD:-root}",
+          "spring.data.redis.host": "redis",
+          "spring.data.redis.port": 6379,
+          "spring.data.redis.database": 3,
+          "spring.data.redis.password": "${REDIS_PASSWORD:-}",
+          "logging.file.path": "${LOG_PATH:-/home/wendao/logs}",
+          "springdoc.swagger-ui.enabled": ${SWAGGER_ENABLED:-false},
+          "spring.datasource.druid.statViewServlet.enabled": ${DRUID_STAT_ENABLED:-false}
+        }
+    volumes:
+      - upload-data:/home/wendao/uploadPath
+      - log-data:/home/wendao/logs
+    healthcheck:
+      test: ["CMD-SHELL", "curl -f -s http://localhost:8080/captchaImage > /dev/null || exit 1"]
+      interval: 30s
+      timeout: 10s
+      retries: 5
+      start_period: 90s
+    networks:
+      - wendao-net
+
+  # ==========================================
+  # Nginx Frontend
+  # ==========================================
+  frontend:
+    build:
+      context: .
+      dockerfile: Dockerfile.frontend
+    image: wendao-frontend:${FRONTEND_VERSION:-latest}
+    container_name: wendao-frontend
+    restart: always
+    depends_on:
+      backend:
+        condition: service_healthy
+    ports:
+      - "3000:80"
+    networks:
+      - wendao-net
+
+# ==========================================
+# Named Volumes (Data Persistence)
+# ==========================================
+volumes:
+  mysql-data:
+    driver: local
+    name: wendao-mysql-data
+  redis-data:
+    driver: local
+    name: wendao-redis-data
+  upload-data:
+    driver: local
+    name: wendao-upload-data
+  log-data:
+    driver: local
+    name: wendao-log-data
+
+# ==========================================
+# Internal Network
+# ==========================================
+networks:
+  wendao-net:
+    driver: bridge
+    name: wendao-net

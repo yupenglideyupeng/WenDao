@@ -1,0 +1,43 @@
+# ============================================================
+# Docker build ignore — speeds up build context transfer
+# ============================================================
+
+# ---- Git ----
+.git/
+.gitignore
+
+# ---- IDE ----
+.idea/
+.vscode/
+*.iml
+
+# ---- Backend build artifacts ----
+console/**/target/
+console/**/*.class
+console/**/*.jar
+console/**/*.log
+
+# ---- Frontend build artifacts ----
+ui/node_modules/
+ui/dist/
+ui/.vite/
+
+# ---- OS ----
+.DS_Store
+Thumbs.db
+
+# ---- Docker ----
+.env.docker
+docker/nginx/ssl/
+docker/nginx/certbot/
+docker/mysql/init/02-wendao.sql
+
+# ---- Project tools ----
+node_modules/
+memory/
+.qoder/
+.claude/
+
+# ---- Other ----
+*.md
+LICENSE
