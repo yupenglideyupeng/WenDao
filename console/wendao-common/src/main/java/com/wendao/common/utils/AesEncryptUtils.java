@@ -78,7 +78,7 @@ public class AesEncryptUtils
 
     /**
      * 对 API Key 进行脱敏展示
-     * 例：sk-2dcb3ab2d5704986b349ba83705f3f82 → sk-****3f82
+     * 例：sk-xxx...xxx → sk-****3f82
      */
     public static String maskApiKey(String apiKey)
     {
