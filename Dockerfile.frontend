@@ -11,8 +11,8 @@ FROM node:20-alpine AS build
 
 WORKDIR /build
 
-# Copy package files for dependency caching
-COPY ui/package.json ui/package-lock.json ./
+# Copy package.json for dependency caching
+COPY ui/package.json ./
 
 # Install dependencies (using npmmirror for faster downloads in China)
 RUN npm install --registry=https://registry.npmmirror.com
