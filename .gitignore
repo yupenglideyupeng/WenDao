@@ -31,6 +31,14 @@ dist/
 Thumbs.db
 
 # ====================================================
+# Docker deployment
+# ====================================================
+.env.docker
+docker/nginx/ssl/*
+docker/nginx/certbot/*
+docker/mysql/init/02-wendao.sql
+
+# ====================================================
 # Sensitive / Local config
 # ====================================================
 *.local

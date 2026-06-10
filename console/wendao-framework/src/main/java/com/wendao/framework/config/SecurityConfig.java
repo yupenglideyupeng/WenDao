@@ -1,6 +1,7 @@
 package com.wendao.framework.config;
 
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.http.HttpMethod;
@@ -21,7 +22,7 @@ import com.wendao.framework.security.handle.LogoutSuccessHandlerImpl;
 
 /**
  * spring security配置
- * 
+ *
  * @author wendao
  */
 @EnableMethodSecurity(prePostEnabled = true, securedEnabled = true)
@@ -45,7 +46,7 @@ public class SecurityConfig
      */
     @Autowired
     private JwtAuthenticationTokenFilter authenticationTokenFilter;
-    
+
     /**
      * 跨域过滤器
      */
@@ -58,14 +59,26 @@ public class SecurityConfig
     @Autowired
     private PermitAllUrlProperties permitAllUrl;
 
-	/**
-	 * 身份验证实现
-	 */
-	@Bean
-	public AuthenticationManager authenticationManager(AuthenticationConfiguration authenticationConfiguration) throws Exception 
-	{
-		return authenticationConfiguration.getAuthenticationManager();
-	}
+    /**
+     * Swagger UI 是否公开访问（生产环境通过环境变量 SWAGGER_ENABLED=false 关闭）
+     */
+    @Value("${springdoc.swagger-ui.enabled:true}")
+    private boolean swaggerEnabled;
+
+    /**
+     * Druid 控制台是否公开访问（生产环境通过环境变量 DRUID_STAT_ENABLED=false 关闭）
+     */
+    @Value("${spring.datasource.druid.statViewServlet.enabled:true}")
+    private boolean druidStatEnabled;
+
+    /**
+     * 身份验证实现
+     */
+    @Bean
+    public AuthenticationManager authenticationManager(AuthenticationConfiguration authenticationConfiguration) throws Exception
+    {
+        return authenticationConfiguration.getAuthenticationManager();
+    }
 
     /**
      * anyRequest          |   匹配所有请求路径
@@ -102,8 +115,16 @@ public class SecurityConfig
                 // 对于登录login 注册register 验证码captchaImage 允许匿名访问
                 requests.requestMatchers("/login", "/register", "/captchaImage").permitAll()
                     // 静态资源，可匿名访问
-                    .requestMatchers(HttpMethod.GET, "/", "/*.html", "/**.html", "/**.css", "/**.js", "/profile/**").permitAll()
-                    .requestMatchers("/swagger-ui.html", "/v3/api-docs/**", "/swagger-ui/**", "/druid/**").permitAll()
+                    .requestMatchers(HttpMethod.GET, "/", "/*.html", "/**.html", "/**.css", "/**.js", "/profile/**").permitAll();
+                // Swagger — 仅开发/测试环境公开，生产环境需登录
+                if (swaggerEnabled) {
+                    requests.requestMatchers("/swagger-ui.html", "/v3/api-docs/**", "/swagger-ui/**").permitAll();
+                }
+                // Druid 控制台 — 仅开发/测试环境公开，生产环境需登录
+                if (druidStatEnabled) {
+                    requests.requestMatchers("/druid/**").permitAll();
+                }
+                requests
                     // WebSocket端点允许匿名访问（认证在HandshakeInterceptor中处理）
                     .requestMatchers("/ws/news/**").permitAll()
                     // SSE解读接口允许匿名访问（认证通过query param token在Controller中处理）

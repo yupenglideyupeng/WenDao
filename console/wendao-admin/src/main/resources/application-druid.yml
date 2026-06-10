@@ -42,7 +42,8 @@ spring:
             webStatFilter: 
                 enabled: true
             statViewServlet:
-                enabled: true
+                # 生产环境通过环境变量 DRUID_STAT_ENABLED=false 关闭
+                enabled: ${DRUID_STAT_ENABLED:true}
                 # 设置白名单，不填则允许所有访问
                 allow:
                 url-pattern: /druid/*

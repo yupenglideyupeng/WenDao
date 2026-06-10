@@ -13,7 +13,8 @@ wendao:
   # 验证码类型 math 数字计算 char 字符验证
   captchaType: math
   # AES加密密钥（32字符，用于敏感字段加解密）
-  aes-key: WenDao2026!AesKey#Secret@9876
+  # 生产环境通过环境变量 WENDAO_AES_KEY 注入
+  aes-key: ${WENDAO_AES_KEY:WenDao2026!AesKey#Secret@9876}
 
 # 开发环境配置
 server:
@@ -36,7 +37,7 @@ server:
 # 日志配置
 logging:
   level:
-    com.wendao: debug
+    com.wendao: ${LOG_LEVEL_COM_WENDAO:debug}
     org.springframework: warn
 
 # 用户配置
@@ -95,8 +96,8 @@ spring:
 token:
   # 令牌自定义标识
   header: Authorization
-  # 令牌密钥
-  secret: abcdefghijklmnopqrstuvwxyz
+  # 令牌密钥（生产环境通过环境变量 TOKEN_SECRET 注入强随机字符串）
+  secret: ${TOKEN_SECRET:abcdefghijklmnopqrstuvwxyz}
   # 令牌有效期（默认30分钟）
   expireTime: 30
 
@@ -120,7 +121,8 @@ springdoc:
   api-docs:
     path: /v3/api-docs
   swagger-ui:
-    enabled: true
+    # 生产环境通过环境变量 SWAGGER_ENABLED=false 关闭
+    enabled: ${SWAGGER_ENABLED:true}
     path: /swagger-ui.html
     tags-sorter: alpha
   group-configs:
@@ -165,8 +167,8 @@ news:
     enabled: true
     # AI API地址（默认DeepSeek，国内直连）
     api-url: https://api.deepseek.com/v1/chat/completions
-    # AI API密钥（在 platform.deepseek.com 获取）
-    api-key: sk-2dcb3ab2d5704986b349ba83705f3f82
+    # AI API密钥（生产环境通过环境变量 NEWS_AI_API_KEY 注入）
+    api-key: ${NEWS_AI_API_KEY:}
     # 模型名称
     model: deepseek-chat
     # 超时时间(毫秒)
