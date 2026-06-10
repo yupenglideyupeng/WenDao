@@ -11,20 +11,17 @@ FROM node:20-alpine AS build
 
 WORKDIR /build
 
-# Install yarn
-RUN corepack enable && corepack prepare yarn@stable --activate
-
 # Copy package files for dependency caching
-COPY ui/package.json ui/yarn.lock ./
+COPY ui/package.json ui/package-lock.json ./
 
 # Install dependencies (using npmmirror for faster downloads in China)
-RUN yarn install --registry=https://registry.npmmirror.com --frozen-lockfile --network-timeout 120000
+RUN npm install --registry=https://registry.npmmirror.com
 
 # Copy full frontend source
 COPY ui/ .
 
 # Build for production (uses .env.production: VITE_APP_BASE_API=/prod-api)
-RUN yarn build:prod
+RUN npm run build:prod
 
 # ---- Stage 2: Nginx Serve ----
 FROM nginx:1.27-alpine
