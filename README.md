@@ -64,7 +64,7 @@
 
 详细流程参见 [docs/news-workflow.md](docs/news-workflow.md)。
 
-### 🏗️ 系统管理（若依标准功能）
+### 🏗️ 系统管理
 
 | 模块 | 功能 |
 |------|------|
@@ -193,7 +193,7 @@ WenDao/
 
 ### 1. 初始化数据库
 
-执行合并后的 SQL 脚本（一张表搞定）：
+执行合并后的 SQL 脚本：
 
 ```bash
 mysql -u root -p -e "CREATE DATABASE IF NOT EXISTS \`ry-vue\` DEFAULT CHARACTER SET utf8mb4 COLLATE utf8mb4_general_ci"
@@ -338,9 +338,3 @@ wendao:
 - 全栈开发工作流
 - 自定义注解使用说明
 - 代码生成器使用指南
-
----
-
-## 📄 License
-
-基于若依（RuoYi-Vue）框架二次开发，遵循 MIT 协议。
