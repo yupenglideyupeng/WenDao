@@ -51,6 +51,9 @@ public class NewsModelConfig extends BaseEntity
     /** 适用场景：INTERPRET/ANALYSIS/EXPANSION/ALL */
     private String usageType;
 
+    /** API格式：OPENAI / ANTHROPIC */
+    private String apiFormat;
+
     /** 请求超时（毫秒） */
     private Integer timeoutMs;
 
@@ -101,6 +104,9 @@ public class NewsModelConfig extends BaseEntity
 
     public String getUsageType() { return usageType; }
     public void setUsageType(String usageType) { this.usageType = usageType; }
+
+    public String getApiFormat() { return apiFormat; }
+    public void setApiFormat(String apiFormat) { this.apiFormat = apiFormat; }
 
     public Integer getTimeoutMs() { return timeoutMs; }
     public void setTimeoutMs(Integer timeoutMs) { this.timeoutMs = timeoutMs; }

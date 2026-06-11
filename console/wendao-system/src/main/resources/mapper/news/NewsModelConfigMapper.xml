@@ -15,6 +15,7 @@
         <result property="supportJsonMode"  column="support_json_mode" />
         <result property="supportStream"    column="support_stream"    />
         <result property="usageType"        column="usage_type"        />
+        <result property="apiFormat"        column="api_format"       />
         <result property="timeoutMs"        column="timeout_ms"        />
         <result property="retryCount"       column="retry_count"       />
         <result property="isActive"         column="is_active"         />
@@ -27,7 +28,7 @@
 
     <sql id="selectVo">
         SELECT id, name, provider, api_url, api_key, model_name, priority,
-               max_tokens, temperature, support_json_mode, support_stream, usage_type,
+               max_tokens, temperature, support_json_mode, support_stream, usage_type, api_format,
                timeout_ms, retry_count, is_active, create_by, create_time,
                update_by, update_time, remark
         FROM news_model_config
@@ -59,11 +60,11 @@
     <insert id="insert" parameterType="com.wendao.system.domain.NewsModelConfig" useGeneratedKeys="true" keyProperty="id">
         INSERT INTO news_model_config (
             name, provider, api_url, api_key, model_name, priority,
-            max_tokens, temperature, support_json_mode, support_stream, usage_type,
+            max_tokens, temperature, support_json_mode, support_stream, usage_type, api_format,
             timeout_ms, retry_count, is_active, create_by, create_time, update_by, update_time, remark
         ) VALUES (
             #{name}, #{provider}, #{apiUrl}, #{apiKey}, #{modelName}, #{priority},
-            #{maxTokens}, #{temperature}, #{supportJsonMode}, #{supportStream}, #{usageType},
+            #{maxTokens}, #{temperature}, #{supportJsonMode}, #{supportStream}, #{usageType}, #{apiFormat},
             #{timeoutMs}, #{retryCount}, #{isActive}, #{createBy}, NOW(), #{updateBy}, NOW(), #{remark}
         )
     </insert>
@@ -82,6 +83,7 @@
             <if test="supportJsonMode != null">support_json_mode = #{supportJsonMode},</if>
             <if test="supportStream != null">support_stream = #{supportStream},</if>
             <if test="usageType != null">usage_type = #{usageType},</if>
+            <if test="apiFormat != null">api_format = #{apiFormat},</if>
             <if test="timeoutMs != null">timeout_ms = #{timeoutMs},</if>
             <if test="retryCount != null">retry_count = #{retryCount},</if>
             <if test="isActive != null">is_active = #{isActive},</if>

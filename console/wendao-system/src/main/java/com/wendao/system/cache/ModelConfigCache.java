@@ -182,6 +182,7 @@ public class ModelConfigCache
         copy.setSupportJsonMode(source.getSupportJsonMode());
         copy.setSupportStream(source.getSupportStream());
         copy.setUsageType(source.getUsageType());
+        copy.setApiFormat(source.getApiFormat());
         copy.setTimeoutMs(source.getTimeoutMs());
         copy.setRetryCount(source.getRetryCount());
         copy.setIsActive(source.getIsActive());
