@@ -1,7 +1,7 @@
 <template>
   <div class="app-container">
     <el-form :model="queryParams" ref="queryRef" :inline="true" v-show="showSearch" label-width="80px">
-      <el-form-item label="提示词类型" prop="promptType">
+      <el-form-item label="提示词类型" prop="promptType" label-width="130">
         <el-select v-model="queryParams.promptType" placeholder="请选择" clearable>
           <el-option label="分析(ANALYSIS)" value="ANALYSIS" />
           <el-option label="解读(INTERPRET)" value="INTERPRET" />
