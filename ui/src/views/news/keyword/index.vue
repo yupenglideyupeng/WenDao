@@ -72,8 +72,8 @@
           <el-input-number v-model="form.fetchInterval" :min="5" :max="1440" placeholder="分钟" />
         </el-form-item>
         <el-form-item label="相关性阈值" prop="relevanceThreshold">
-          <el-input-number v-model="form.relevanceThreshold" :min="0" :max="100" placeholder="0-100" />
-          <span style="margin-left: 8px; color: #909399; font-size: 12px;">低于此值的文章自动下架</span>
+          <el-input-number v-model="form.relevanceThreshold" :min="60" :max="100" placeholder="60-100" />
+          <span style="margin-left: 8px; color: #909399; font-size: 12px;">低于此值的文章自动下架（最低60）</span>
         </el-form-item>
         <el-form-item label="状态" prop="isActive">
           <el-radio-group v-model="form.isActive">
