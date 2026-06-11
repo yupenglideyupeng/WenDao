@@ -676,6 +676,13 @@ public class NewsFetcherServiceImpl implements INewsFetcherService
                         }
                         if (StringUtils.isEmpty(article.getTitle())) continue;
 
+                        // 标题必须包含原始关键词（防止搜索扩展词/微博宽松匹配引入的无关内容）
+                        if (!titleContainsKeyword(article.getTitle(), kw.getText()))
+                        {
+                            log.debug("标题不包含原始关键词 [{}]，跳过: {}", kw.getText(), article.getTitle());
+                            continue;
+                        }
+
                         article.setSourceId(null);
                         article.setKeywordId(kw.getId());
                         article.setIsPushed("0");
@@ -830,5 +837,51 @@ public class NewsFetcherServiceImpl implements INewsFetcherService
             }
         }
         return null;
+    }
+
+    /**
+     * 检查标题是否包含原始关键词（防止搜索扩展词和微博热搜宽松匹配引入的无关内容）
+     * <ul>
+     *   <li>中文关键词：子串包含匹配</li>
+     *   <li>英文关键词：大小写不敏感 + 至少 4 字符才做子串匹配，
+     *       短于 4 字符时要求关键词作为独立单词出现（防止 "ai" 匹配 "detail"/"shanghai" 等）</li>
+     * </ul>
+     *
+     * @param title   文章标题
+     * @param keyword 原始关键词
+     * @return 是否匹配
+     */
+    private boolean titleContainsKeyword(String title, String keyword)
+    {
+        if (StringUtils.isEmpty(title) || StringUtils.isEmpty(keyword)) return false;
+
+        String kwLower = keyword.toLowerCase();
+        boolean kwIsChinese = containsChinese(keyword);
+
+        if (kwIsChinese)
+        {
+            return title.contains(keyword);
+        }
+        else
+        {
+            // 英文短词（<4字符）：必须作为独立单词出现，避免 "ai" 匹配 "detail" 等
+            if (keyword.length() < 4)
+            {
+                String titleLower = title.toLowerCase();
+                int idx = titleLower.indexOf(kwLower);
+                while (idx >= 0)
+                {
+                    // 检查前后是否为单词边界
+                    boolean startOk = idx == 0 || !Character.isLetter(titleLower.charAt(idx - 1));
+                    boolean endOk = idx + kwLower.length() >= titleLower.length()
+                            || !Character.isLetter(titleLower.charAt(idx + kwLower.length()));
+                    if (startOk && endOk) return true;
+                    idx = titleLower.indexOf(kwLower, idx + 1);
+                }
+                return false;
+            }
+            // 英文长词（≥4字符）：子串匹配即可
+            return title.toLowerCase().contains(kwLower);
+        }
     }
 }

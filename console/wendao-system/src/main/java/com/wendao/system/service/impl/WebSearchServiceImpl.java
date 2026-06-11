@@ -243,8 +243,8 @@ public class WebSearchServiceImpl implements IWebSearchService
                         if (topicName == null) continue;
                         String topicLower = topicName.toLowerCase();
 
-                        // 关键词匹配
-                        if (topicLower.contains(kwLower) || kwLower.contains(topicLower))
+                        // 关键词匹配（英文短词做单词边界检查，防止 "AI" 匹配 "DETAIL"/"SHANGHAI" 等）
+                        if (isKeywordMatch(topicName, keyword))
                         {
                             NewsArticle article = new NewsArticle();
                             article.setTitle("🔥 " + topicName);
@@ -269,5 +269,50 @@ public class WebSearchServiceImpl implements IWebSearchService
             log.warn("微博热搜异常: {}", e.getMessage());
         }
         return articles;
+    }
+
+    /**
+     * 关键词匹配：中文子串匹配，英文短词（<4字符）做单词边界检查
+     * 防止 "AI" 匹配 "DETAIL"、"SHANGHAI"、"MAIN" 等
+     */
+    private boolean isKeywordMatch(String text, String keyword)
+    {
+        if (StringUtils.isEmpty(text) || StringUtils.isEmpty(keyword)) return false;
+
+        // 判断关键词是否含中文
+        boolean kwIsChinese = false;
+        for (char c : keyword.toCharArray())
+        {
+            if (Character.UnicodeScript.of(c) == Character.UnicodeScript.HAN)
+            {
+                kwIsChinese = true;
+                break;
+            }
+        }
+
+        if (kwIsChinese)
+        {
+            return text.contains(keyword);
+        }
+
+        // 英文关键词
+        String kwLower = keyword.toLowerCase();
+        if (keyword.length() < 4)
+        {
+            // 短词：单词边界匹配
+            String textLower = text.toLowerCase();
+            int idx = textLower.indexOf(kwLower);
+            while (idx >= 0)
+            {
+                boolean startOk = idx == 0 || !Character.isLetter(textLower.charAt(idx - 1));
+                boolean endOk = idx + kwLower.length() >= textLower.length()
+                        || !Character.isLetter(textLower.charAt(idx + kwLower.length()));
+                if (startOk && endOk) return true;
+                idx = textLower.indexOf(kwLower, idx + 1);
+            }
+            return false;
+        }
+
+        return text.toLowerCase().contains(kwLower);
     }
 }
