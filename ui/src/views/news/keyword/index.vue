@@ -41,7 +41,7 @@
       <el-table-column label="间隔(分钟)" align="center" prop="fetchInterval" width="100" />
       <el-table-column label="相关性阈值" align="center" prop="relevanceThreshold" width="100">
         <template #default="scope">
-          <span>{{ scope.row.relevanceThreshold ?? 40 }}</span>
+          <span>{{ scope.row.relevanceThreshold ?? 60 }}</span>
         </template>
       </el-table-column>
       <el-table-column label="上次抓取" align="center" prop="lastFetchTime" width="180">
@@ -147,7 +147,7 @@ function reset() {
     category: undefined,
     isActive: 1,
     fetchInterval: 30,
-    relevanceThreshold: 40
+    relevanceThreshold: 60
   } as NewsKeyword
   proxy?.resetForm('keywordRef')
 }

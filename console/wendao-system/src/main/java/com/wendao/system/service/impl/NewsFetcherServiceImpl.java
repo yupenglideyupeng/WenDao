@@ -663,7 +663,7 @@ public class NewsFetcherServiceImpl implements INewsFetcherService
                 }
 
                 // 3. 保存 + 标记来源方式 + 深度AI分析（带阈值）
-                int threshold = kw.getRelevanceThreshold() != null ? kw.getRelevanceThreshold() : 40;
+                int threshold = kw.getRelevanceThreshold() != null ? kw.getRelevanceThreshold() : 60;
                 int kwCount = 0;
                 for (NewsArticle article : allResults)
                 {

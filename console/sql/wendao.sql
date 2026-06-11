@@ -1066,7 +1066,7 @@ ALTER TABLE news_source
 
 -- news_keyword 新增字段：相关性阈值、扩展查询词
 ALTER TABLE news_keyword
-  ADD COLUMN relevance_threshold INT DEFAULT 40 COMMENT '相关性阈值,低于此值自动下架',
+  ADD COLUMN relevance_threshold INT DEFAULT 60 COMMENT '相关性阈值,低于此值自动下架',
   ADD COLUMN expand_queries JSON DEFAULT NULL COMMENT '扩展查询词列表';
 
 -- news_article 新增字段：来源方式标记
