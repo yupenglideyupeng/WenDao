@@ -177,6 +177,27 @@ public class NewsFetcherServiceImpl implements INewsFetcherService
                 log.warn("不支持的抓取方式: {} (来源: {})", source.getFetchType(), source.getName());
                 return 0;
         }
+
+        // 加载激活关键词，按来源语言过滤匹配词列表
+        List<NewsKeyword> activeKeywords = keywordService.selectActiveKeywords();
+        boolean isForeignSource = "1".equals(source.getType());
+        List<NewsKeyword> matchableKeywords = new ArrayList<>();
+        if (activeKeywords != null)
+        {
+            for (NewsKeyword kw : activeKeywords)
+            {
+                boolean kwIsChinese = containsChinese(kw.getText());
+                if (isForeignSource && !kwIsChinese)
+                {
+                    matchableKeywords.add(kw);  // 英文源 → 匹配英文关键词
+                }
+                else if (!isForeignSource && kwIsChinese)
+                {
+                    matchableKeywords.add(kw);  // 中文源 → 匹配中文关键词
+                }
+            }
+        }
+
         int count = 0;
         int maxArticles = source.getMaxArticlesPerFetch() != null ? source.getMaxArticlesPerFetch() : 10;
         boolean isPrimary = "PRIMARY".equals(source.getFetchMode());
@@ -194,6 +215,20 @@ public class NewsFetcherServiceImpl implements INewsFetcherService
                         continue;
                     }
                 }
+
+                // 关键词匹配过滤：标题必须包含至少一个匹配语言的关键词
+                if (!matchableKeywords.isEmpty())
+                {
+                    NewsKeyword matchedKw = matchKeyword(article.getTitle(), matchableKeywords, isForeignSource);
+                    if (matchedKw == null)
+                    {
+                        log.debug("文章标题不匹配任何关键词，跳过: {}", article.getTitle());
+                        continue;
+                    }
+                    article.setKeywordId(matchedKw.getId());
+                }
+                // 无匹配词列表时（未配置关键词），保持原行为：全部放行
+
                 article.setSourceId(source.getId());
                 article.setSourceName(source.getName());
                 article.setIsPushed("0");
@@ -203,7 +238,7 @@ public class NewsFetcherServiceImpl implements INewsFetcherService
                 // 根据来源类型设置语言
                 if (StringUtils.isEmpty(article.getLanguage()))
                 {
-                    article.setLanguage("1".equals(source.getType()) ? "en" : "zh");
+                    article.setLanguage(isForeignSource ? "en" : "zh");
                 }
                 newsArticleService.insertArticle(article);
                 // PRIMARY高质量源启用深度AI分析，其他使用基础分析
@@ -224,7 +259,7 @@ public class NewsFetcherServiceImpl implements INewsFetcherService
         }
         if (count > 0)
         {
-            log.info("从 [{}] 抓取到 {} 篇新文章", source.getName(), count);
+            log.info("从 [{}] 抓取到 {} 篇新文章（已过滤关键词不匹配项）", source.getName(), count);
         }
         return count;
     }
@@ -736,5 +771,64 @@ public class NewsFetcherServiceImpl implements INewsFetcherService
         {
             return new Date();
         }
+    }
+
+    /**
+     * 判断字符串是否包含中文字符
+     */
+    private boolean containsChinese(String text)
+    {
+        if (StringUtils.isEmpty(text)) return false;
+        for (char c : text.toCharArray())
+        {
+            if (Character.UnicodeScript.of(c) == Character.UnicodeScript.HAN)
+            {
+                return true;
+            }
+        }
+        return false;
+    }
+
+    /**
+     * 关键词匹配：检查标题是否包含任一关键词
+     * <ul>
+     *   <li>中文关键词：子串包含匹配</li>
+     *   <li>英文关键词：大小写不敏感子串匹配</li>
+     * </ul>
+     *
+     * @param title      文章标题
+     * @param keywords   候选关键词列表（已按语言过滤）
+     * @param foreignSource 是否为国外源（影响匹配策略）
+     * @return 匹配到的关键词，未匹配返回 null
+     */
+    private NewsKeyword matchKeyword(String title, List<NewsKeyword> keywords, boolean foreignSource)
+    {
+        if (StringUtils.isEmpty(title) || keywords.isEmpty()) return null;
+
+        String titleLower = foreignSource ? title.toLowerCase() : title;
+
+        for (NewsKeyword kw : keywords)
+        {
+            String kwText = kw.getText();
+            if (StringUtils.isEmpty(kwText)) continue;
+
+            if (foreignSource)
+            {
+                // 英文匹配：大小写不敏感
+                if (titleLower.contains(kwText.toLowerCase()))
+                {
+                    return kw;
+                }
+            }
+            else
+            {
+                // 中文匹配：直接子串包含
+                if (title.contains(kwText))
+                {
+                    return kw;
+                }
+            }
+        }
+        return null;
     }
 }
