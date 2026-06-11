@@ -19,7 +19,50 @@
 | **关键词监控** | 关键词驱动抓取，查询扩展（自动生成相关搜索词），关联度阈值过滤 |
 | **AI 智能解读** | SSE 流式输出，Markdown 渲染 + Mermaid 流程图，多版本历史切换，导出 PDF/HTML |
 | **提示词配置** | 支持 ANALYSIS / INTERPRET / AGGREGATE / COMPARE 四种类型，多对多关联新闻类型 |
-| **模型管理** | 多厂商支持（DeepSeek / 硅基流动 / 阿里百炼 / 智谱 GLM / 火山引擎 / 自定义），API Key AES 加密存储，连接测试，按优先级+场景自动匹配 |
+| **模型管理** | 多厂商支持（DeepSeek / 硅基流动 / 阿里百炼 / 智谱 GLM / 火山引擎 / 自定义），API Key AES 加密存储，连接测试，按优先级+场景自动匹配，支持 OpenAI / Anthropic 双 API 格式 |
+
+### 📰 新闻采集工作流程
+
+```
+定时任务 (每5分钟)
+    │
+    ├── ① 新闻源抓取 (fetchPrimarySources)
+    │       └── 仅 PRIMARY 模式的新闻源（RSS/API/CRAWL）
+    │            → 标题关键词匹配过滤
+    │
+    └── ② 关键词搜索 (fetchByKeywords)
+            └── 所有激活的关键词
+                 → AI 查询扩展（同义词生成）
+                 → 多引擎搜索（Bing / 搜狗 / B站 / 微博）
+                 → 原始关键词匹配过滤
+                    │
+                    ▼
+            ③ 去重 & 入库 (news_article)
+                    │
+                    ▼
+            ④ 异步 AI 分析 → 深度评分（摘要/标签/情感/类型/relevance）
+                    │
+                    ▼
+            ⑤ 相关性阈值过滤（relevance ≥ 60 → status=0，< 60 → status=1 下架）
+                    │
+                    ▼
+            ⑥ WebSocket 实时推送（仅 status=0）
+                    │
+                    ▼
+            ⑦ 前端展示（文章列表 / 大屏看板 / 一键解读 SSE 流式）
+```
+
+**三层过滤机制：**
+
+| 层级 | 位置 | 说明 |
+|---|---|---|
+| **第一层** | 入库前 | 标题必须包含激活关键词（中文子串匹配 / 英文短词独立单词边界匹配），不匹配直接丢弃 |
+| **第二层** | AI 分析 | AI 模型综合评估文章相关性，输出 `relevance` 评分（0-100） |
+| **第三层** | AI 分析后 | `relevance < 阈值`（默认 60）→ `status=1` 自动下架，前端不可见 |
+
+**英文短词单词边界匹配：** 关键词长度 < 4 时（如 "AI"），使用单词边界检查，防止 "AI" 误匹配 "DETAIL"、"SHANGHAI" 等单词中的 "ai" 子串。
+
+详细流程参见 [docs/news-workflow.md](docs/news-workflow.md)。
 
 ### 🏗️ 系统管理（若依标准功能）
 
@@ -226,21 +269,19 @@ wendao:
 
 ### AI 新闻模块配置
 
+AI 模型配置已迁移至数据库 `news_model_config` 表，通过管理界面"新闻管理 → 模型管理"进行配置，支持 Redis 缓存（5分钟 TTL）。
+
 ```yaml
 news:
   fetch-interval-ms: 300000       # 新闻抓取间隔（毫秒）
   query-expansion:
-    enabled: true                  # 是否启用查询扩展
+    enabled: true                  # 是否启用 AI 查询扩展
     max-terms: 3                   # 最大扩展词数
-  relevance-threshold: 40          # 关联度阈值（0-100）
   ai:
     enabled: true                  # 是否启用 AI 分析
-    deepseek:
-      api-url: https://api.deepseek.com/v1/chat/completions
-      api-key: your-api-key
-      model: deepseek-chat
-      timeout-ms: 30000
 ```
+
+每个关键词可单独配置 `relevance_threshold`（默认 **60**，范围 0-100），低于阈值的文章自动下架。
 
 ### 文件上传
 
