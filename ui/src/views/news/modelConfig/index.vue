@@ -35,9 +35,14 @@
       </el-table-column>
       <el-table-column label="模型" prop="modelName" width="150" :show-overflow-tooltip="true" />
       <el-table-column label="优先级" prop="priority" width="70" align="center" />
-      <el-table-column label="适用场景" prop="usageType" width="120" align="center">
+      <el-table-column label="适用场景" prop="usageType" width="200" align="center">
         <template #default="scope">
-          <el-tag v-for="t in parseUsageTypes(scope.row.usageType)" :key="t" size="small" class="ml-1" :type="usageTagType(t)">{{ usageLabel(t) }}</el-tag>
+          <el-tag style="margin-left: 5px" v-for="t in parseUsageTypes(scope.row.usageType)" :key="t" size="small" class="ml-1" :type="usageTagType(t)">{{ usageLabel(t) }}</el-tag>
+        </template>
+      </el-table-column>
+      <el-table-column label="API格式" prop="apiFormat" width="110" align="center">
+        <template #default="scope">
+          <dict-tag :options="news_api_format" :value="scope.row.apiFormat" />
         </template>
       </el-table-column>
       <el-table-column label="JSON" prop="supportJsonMode" width="60" align="center">
@@ -111,6 +116,11 @@
             <el-checkbox label="EXPANSION">查询扩展</el-checkbox>
           </el-checkbox-group>
         </el-form-item>
+        <el-form-item label="API格式" prop="apiFormat">
+          <el-radio-group v-model="form.apiFormat">
+            <el-radio v-for="f in news_api_format" :key="f.value" :value="f.value">{{ f.label }}</el-radio>
+          </el-radio-group>
+        </el-form-item>
         <el-row :gutter="20">
           <el-col :span="8">
             <el-form-item label="JSON模式"><el-switch v-model="form.supportJsonMode" :active-value="1" :inactive-value="0" /></el-form-item>
@@ -145,7 +155,7 @@ import type { NewsModelConfig, NewsModelConfigQueryParams } from '@/types/api/ne
 import { useDict } from '@/utils/dict'
 const { proxy } = getCurrentInstance()
 
-const { news_model_provider } = useDict('news_model_provider')
+const { news_model_provider, news_api_format } = useDict('news_model_provider', 'news_api_format')
 
 const list = ref<NewsModelConfig[]>([]); const open = ref(false); const loading = ref(true); const showSearch = ref(true)
 const ids = ref<number[]>([]); const single = ref(true); const multiple = ref(true); const total = ref(0); const title = ref('')
@@ -154,7 +164,7 @@ const testResult = ref<{ success: boolean; message: string; modelName?: string }
 const usageTypeList = ref<string[]>(['INTERPRET', 'ANALYSIS', 'EXPANSION'])
 
 const data = reactive({
-  form: { provider: 'DEEPSEEK', priority: 1, maxTokens: 2000, temperature: 0.3, supportJsonMode: 1, supportStream: 1, timeoutMs: 30000, retryCount: 1, isActive: 1 } as NewsModelConfig,
+  form: { provider: 'DEEPSEEK', priority: 1, maxTokens: 2000, temperature: 0.3, supportJsonMode: 1, supportStream: 1, timeoutMs: 30000, retryCount: 1, isActive: 1, apiFormat: 'OPENAI' } as NewsModelConfig,
   queryParams: { pageNum: 1, pageSize: 10 } as NewsModelConfigQueryParams,
   rules: {
     name: [{ required: true, message: '配置名称不能为空', trigger: 'blur' }],

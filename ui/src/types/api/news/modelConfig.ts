@@ -24,6 +24,7 @@ export interface NewsModelConfig extends BaseEntity {
   supportJsonMode: number   // 0/1
   supportStream: number     // 0/1
   usageType: string         // INTERPRET/ANALYSIS/EXPANSION/ALL
+  apiFormat?: string        // OPENAI/ANTHROPIC
   timeoutMs?: number
   retryCount?: number
   isActive: number          // 0/1
