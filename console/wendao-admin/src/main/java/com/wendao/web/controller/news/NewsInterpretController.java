@@ -82,6 +82,9 @@ public class NewsInterpretController extends BaseController
     @Autowired
     private TokenService tokenService;
 
+    @Autowired
+    private com.wendao.system.utils.AiApiClient aiApiClient;
+
     /**
      * 查询文章最新解读记录
      */
@@ -188,28 +191,15 @@ public class NewsInterpretController extends BaseController
             startData.put("modelName", modelConfig.getModelName());
             writeEvent(outputStream, "start", startData.toJSONString());
 
-            // 7. 构建流式请求体（使用模型配置的参数）
-            String requestBodyJson = buildRequestBody(article, systemPrompt, promptCfg, modelConfig).toJSONString();
+            // 7. 构建消息列表和参数
+            java.util.List<java.util.Map<String, String>> messages = buildMessages(article, systemPrompt);
+            double temperature = resolveTemperature(promptCfg, modelConfig);
+            int maxTokens = resolveMaxTokens(promptCfg, modelConfig);
 
-            // 8. 建立 HttpURLConnection 连接
-            URL url = new URL(modelConfig.getApiUrl());
-            int timeout = modelConfig.getTimeoutMs() != null ? modelConfig.getTimeoutMs() : 30000;
-            connection = (HttpURLConnection) url.openConnection();
-            connection.setRequestMethod("POST");
-            connection.setDoOutput(true);
-            connection.setConnectTimeout(timeout);
-            connection.setReadTimeout(180_000);
-            connection.setRequestProperty("Content-Type", "application/json;charset=UTF-8");
-            connection.setRequestProperty("Authorization", "Bearer " + modelConfig.getApiKey());
+            // 8. 通过 AiApiClient 建立流式连接
+            connection = aiApiClient.callStreaming(modelConfig, messages, maxTokens, temperature);
 
-            // 写入请求体
-            try (OutputStream reqOut = connection.getOutputStream())
-            {
-                reqOut.write(requestBodyJson.getBytes(StandardCharsets.UTF_8));
-                reqOut.flush();
-            }
-
-            // 8. 检查 HTTP 状态
+            // 9. 检查 HTTP 状态
             int httpCode = connection.getResponseCode();
             if (httpCode != 200)
             {
@@ -233,48 +223,53 @@ public class NewsInterpretController extends BaseController
                     new InputStreamReader(connection.getInputStream(), StandardCharsets.UTF_8)))
             {
                 String line;
+                boolean isAnthropic = "ANTHROPIC".equalsIgnoreCase(modelConfig.getApiFormat());
                 while ((line = reader.readLine()) != null)
                 {
                     if (line.isEmpty()) continue;
 
-                    // DeepSeek 流式响应格式：data: {...}  或  data: [DONE]
-                    if (!line.startsWith("data:")) continue;
-
-                    String dataStr = line.substring("data:".length()).trim();
-
-                    if ("[DONE]".equals(dataStr))
+                    // 检查流结束标记
+                    if (aiApiClient.isStreamDone(line, modelConfig.getApiFormat()))
                     {
-                        // 流结束，跳出循环
                         break;
                     }
 
-                    // 解析 delta.content，累积完整内容用于落库
-                    try
+                    // 使用 AiApiClient 统一解析增量内容
+                    String deltaContent = aiApiClient.parseStreamLine(line, modelConfig.getApiFormat());
+
+                    // 累积完整内容用于落库
+                    if (StringUtils.isNotEmpty(deltaContent))
                     {
-                        JSONObject parsed = JSON.parseObject(dataStr);
-                        JSONArray choices = parsed.getJSONArray("choices");
-                        if (choices != null && !choices.isEmpty())
-                        {
-                            JSONObject delta = choices.getJSONObject(0).getJSONObject("delta");
-                            if (delta != null)
-                            {
-                                String content = delta.getString("content");
-                                if (StringUtils.isNotEmpty(content))
-                                {
-                                    fullContent.append(content);
-                                }
-                            }
-                        }
-                    }
-                    catch (Exception parseEx)
-                    {
-                        log.debug("解析 DeepSeek chunk 异常（跳过）: {}", parseEx.getMessage());
+                        fullContent.append(deltaContent);
                     }
 
-                    // 将原始 data: 行直接转发给前端（前端自行解析 delta.content）
-                    String eventData = line + "\n\n";
-                    outputStream.write(eventData.getBytes(StandardCharsets.UTF_8));
-                    outputStream.flush();
+                    if (isAnthropic)
+                    {
+                        // Anthropic 格式：将内容块转换为 OpenAI 兼容的 SSE 格式转发给前端
+                        if (StringUtils.isNotEmpty(deltaContent))
+                        {
+                            JSONObject fakeOpenAI = new JSONObject();
+                            JSONArray choices = new JSONArray();
+                            JSONObject choice = new JSONObject();
+                            JSONObject delta = new JSONObject();
+                            delta.put("content", deltaContent);
+                            choice.put("delta", delta);
+                            choice.put("index", 0);
+                            choices.add(choice);
+                            fakeOpenAI.put("choices", choices);
+                            String eventData = "data: " + fakeOpenAI.toJSONString() + "\n\n";
+                            outputStream.write(eventData.getBytes(StandardCharsets.UTF_8));
+                            outputStream.flush();
+                        }
+                        // 非内容事件（ping, message_start, content_block_start 等）跳过，不转发
+                    }
+                    else
+                    {
+                        // OpenAI 格式：直接将原始 data: 行转发给前端
+                        String eventData = line + "\n\n";
+                        outputStream.write(eventData.getBytes(StandardCharsets.UTF_8));
+                        outputStream.flush();
+                    }
                 }
             }
 
@@ -310,41 +305,43 @@ public class NewsInterpretController extends BaseController
     }
 
     /**
-     * 构建 DeepSeek 请求体（stream: true）
+     * 构建消息列表（system + user）
      */
-    private JSONObject buildRequestBody(NewsArticle article, String systemPrompt, NewsPromptConfig promptCfg, NewsModelConfig modelConfig)
+    private java.util.List<java.util.Map<String, String>> buildMessages(NewsArticle article, String systemPrompt)
     {
-        double temperature = 0.5;
-        int maxTokens = 2000;
-        if (promptCfg != null)
-        {
-            if (promptCfg.getTemperature() != null) temperature = promptCfg.getTemperature();
-            if (promptCfg.getMaxTokens() != null) maxTokens = promptCfg.getMaxTokens();
-        }
-        // 模型配置覆盖（如果提示词未指定）
-        if (promptCfg == null && modelConfig.getTemperature() != null) temperature = modelConfig.getTemperature().doubleValue();
-        if (promptCfg == null && modelConfig.getMaxTokens() != null) maxTokens = modelConfig.getMaxTokens();
+        java.util.List<java.util.Map<String, String>> messages = new java.util.ArrayList<>();
 
-        JSONObject body = new JSONObject();
-        body.put("model", modelConfig.getModelName());
-        body.put("temperature", temperature);
-        body.put("max_tokens", maxTokens);
-        body.put("stream", true);   // 真流式
-
-        JSONArray messages = new JSONArray();
-
-        JSONObject sysMsg = new JSONObject();
+        java.util.Map<String, String> sysMsg = new java.util.HashMap<>();
         sysMsg.put("role", "system");
         sysMsg.put("content", systemPrompt);
         messages.add(sysMsg);
 
-        JSONObject userMsg = new JSONObject();
+        java.util.Map<String, String> userMsg = new java.util.HashMap<>();
         userMsg.put("role", "user");
         userMsg.put("content", buildUserContent(article));
         messages.add(userMsg);
 
-        body.put("messages", messages);
-        return body;
+        return messages;
+    }
+
+    /**
+     * 解析温度参数
+     */
+    private double resolveTemperature(NewsPromptConfig promptCfg, NewsModelConfig modelConfig)
+    {
+        if (promptCfg != null && promptCfg.getTemperature() != null) return promptCfg.getTemperature();
+        if (modelConfig.getTemperature() != null) return modelConfig.getTemperature().doubleValue();
+        return 0.5;
+    }
+
+    /**
+     * 解析最大 token 数
+     */
+    private int resolveMaxTokens(NewsPromptConfig promptCfg, NewsModelConfig modelConfig)
+    {
+        if (promptCfg != null && promptCfg.getMaxTokens() != null) return promptCfg.getMaxTokens();
+        if (modelConfig.getMaxTokens() != null) return modelConfig.getMaxTokens();
+        return 2000;
     }
 
     /**

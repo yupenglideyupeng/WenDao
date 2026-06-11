@@ -5,12 +5,7 @@ import java.util.List;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.http.HttpEntity;
-import org.springframework.http.HttpHeaders;
-import org.springframework.http.MediaType;
-import org.springframework.http.ResponseEntity;
 import org.springframework.stereotype.Service;
-import org.springframework.web.client.RestTemplate;
 import com.alibaba.fastjson2.JSON;
 import com.alibaba.fastjson2.JSONArray;
 import com.wendao.common.utils.StringUtils;
@@ -40,7 +35,8 @@ public class QueryExpansionServiceImpl implements IQueryExpansionService
     @Autowired
     private NewsQueryExpansionMapper expansionMapper;
 
-    private final RestTemplate restTemplate = new RestTemplate();
+    @Autowired
+    private com.wendao.system.utils.AiApiClient aiApiClient;
 
     private static final String USAGE_TYPE = "EXPANSION";
 
@@ -121,50 +117,19 @@ public class QueryExpansionServiceImpl implements IQueryExpansionService
                     + "例如：输入\"AI\" → [\"人工智能\",\"AI技术\",\"人工智能技术\"]\n"
                     + "仅返回JSON数组，不要其他内容。";
 
-            com.alibaba.fastjson2.JSONObject body = new com.alibaba.fastjson2.JSONObject();
-            body.put("model", modelConfig.getModelName());
-            body.put("temperature", 0.3);
-            body.put("max_tokens", 100);
-            body.put("stream", false);
+            // 使用 AiApiClient 统一调用
+            java.util.List<java.util.Map<String, String>> msgList = new java.util.ArrayList<>();
+            java.util.Map<String, String> sysMap = new java.util.HashMap<>();
+            sysMap.put("role", "system");
+            sysMap.put("content", "你是一个关键词扩展助手。仅返回JSON数组，不要任何其他文字。");
+            msgList.add(sysMap);
+            java.util.Map<String, String> userMap = new java.util.HashMap<>();
+            userMap.put("role", "user");
+            userMap.put("content", prompt);
+            msgList.add(userMap);
 
-            JSONArray messages = new JSONArray();
-            com.alibaba.fastjson2.JSONObject sysMsg = new com.alibaba.fastjson2.JSONObject();
-            sysMsg.put("role", "system");
-            sysMsg.put("content", "你是一个关键词扩展助手。仅返回JSON数组，不要任何其他文字。");
-            messages.add(sysMsg);
+            String content = aiApiClient.callNonStreaming(modelConfig, msgList, 100, 0.3, false);
 
-            com.alibaba.fastjson2.JSONObject userMsg = new com.alibaba.fastjson2.JSONObject();
-            userMsg.put("role", "user");
-            userMsg.put("content", prompt);
-            messages.add(userMsg);
-
-            body.put("messages", messages);
-
-            int timeout = modelConfig.getTimeoutMs() != null ? modelConfig.getTimeoutMs() : 10000;
-            restTemplate.setRequestFactory(new org.springframework.http.client.SimpleClientHttpRequestFactory() {{
-                setConnectTimeout(timeout);
-                setReadTimeout(timeout);
-            }});
-
-            HttpHeaders headers = new HttpHeaders();
-            headers.setContentType(MediaType.APPLICATION_JSON);
-            headers.set("Authorization", "Bearer " + modelConfig.getApiKey());
-
-            HttpEntity<String> entity = new HttpEntity<>(body.toJSONString(), headers);
-            ResponseEntity<String> response = restTemplate.postForEntity(
-                    modelConfig.getApiUrl(), entity, String.class);
-
-            if (!response.getStatusCode().is2xxSuccessful())
-            {
-                log.error("查询扩展AI请求失败，状态码: {}", response.getStatusCode().value());
-                return expansions;
-            }
-
-            com.alibaba.fastjson2.JSONObject respJson = JSON.parseObject(response.getBody());
-            JSONArray choices = respJson.getJSONArray("choices");
-            if (choices == null || choices.isEmpty()) return expansions;
-
-            String content = choices.getJSONObject(0).getJSONObject("message").getString("content");
             String jsonStr = content.trim();
             if (jsonStr.startsWith("```"))
             {

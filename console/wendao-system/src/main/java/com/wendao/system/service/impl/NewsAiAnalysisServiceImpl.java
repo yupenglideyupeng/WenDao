@@ -5,13 +5,8 @@ import java.util.stream.Collectors;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.http.HttpEntity;
-import org.springframework.http.HttpHeaders;
-import org.springframework.http.MediaType;
-import org.springframework.http.ResponseEntity;
 import org.springframework.scheduling.annotation.Async;
 import org.springframework.stereotype.Service;
-import org.springframework.web.client.RestTemplate;
 import com.alibaba.fastjson2.JSON;
 import com.alibaba.fastjson2.JSONArray;
 import com.alibaba.fastjson2.JSONObject;
@@ -52,7 +47,8 @@ public class NewsAiAnalysisServiceImpl implements INewsAiAnalysisService
     @Autowired
     private INewsTypeConfigService typeConfigService;
 
-    private final RestTemplate restTemplate = new RestTemplate();
+    @Autowired
+    private com.wendao.system.utils.AiApiClient aiApiClient;
 
     /** AI分析场景标识 */
     private static final String USAGE_TYPE = "ANALYSIS";
@@ -120,38 +116,24 @@ public class NewsAiAnalysisServiceImpl implements INewsAiAnalysisService
 
             JSONObject requestBody = buildRequestBody(article, keyword, promptCfg, activeTypes, relevanceThreshold, modelConfig);
 
-            HttpHeaders headers = new HttpHeaders();
-            headers.setContentType(MediaType.APPLICATION_JSON);
-            headers.set("Authorization", "Bearer " + modelConfig.getApiKey());
-
-            int timeout = modelConfig.getTimeoutMs() != null ? modelConfig.getTimeoutMs() : 30000;
-            restTemplate.setRequestFactory(new org.springframework.http.client.SimpleClientHttpRequestFactory() {{
-                setConnectTimeout(timeout);
-                setReadTimeout(timeout);
-            }});
-
-            HttpEntity<String> entity = new HttpEntity<>(requestBody.toJSONString(), headers);
-            ResponseEntity<String> response = restTemplate.postForEntity(
-                    modelConfig.getApiUrl(), entity, String.class);
-
-            if (!response.getStatusCode().is2xxSuccessful())
+            // 提取 messages 列表和参数
+            boolean useDeep = keyword != null || relevanceThreshold > 0;
+            int maxTokens = useDeep ? 400 : 300;
+            double temperature = 0.3;
+            if (promptCfg != null)
             {
-                log.error("AI分析请求失败，状态码: {}，模型: {}，文章: {}",
-                        response.getStatusCode().value(), modelConfig.getModelName(), article.getTitle());
-                return;
+                if (promptCfg.getTemperature() != null) temperature = promptCfg.getTemperature();
+                if (promptCfg.getMaxTokens() != null) maxTokens = promptCfg.getMaxTokens();
             }
+            if (modelConfig.getMaxTokens() != null && promptCfg == null) maxTokens = modelConfig.getMaxTokens();
+            if (modelConfig.getTemperature() != null && promptCfg == null) temperature = modelConfig.getTemperature().doubleValue();
 
-            JSONObject respJson = JSON.parseObject(response.getBody());
-            JSONArray choices = respJson.getJSONArray("choices");
-            if (choices == null || choices.isEmpty())
-            {
-                log.warn("AI分析返回空choices，模型: {}，文章: {}", modelConfig.getModelName(), article.getTitle());
-                return;
-            }
+            java.util.List<java.util.Map<String, String>> messages = extractMessages(requestBody);
+            boolean jsonMode = modelConfig.getSupportJsonMode() != null && modelConfig.getSupportJsonMode() == 1;
 
-            String aiContent = choices.getJSONObject(0).getJSONObject("message").getString("content");
-            boolean isDeep = keyword != null || relevanceThreshold > 0;
-            parseAiResult(article, aiContent, isDeep, relevanceThreshold);
+            String aiContent = aiApiClient.callNonStreaming(modelConfig, messages, maxTokens, temperature, jsonMode);
+
+            parseAiResult(article, aiContent, useDeep, relevanceThreshold);
 
             newsArticleService.updateArticle(article);
             log.info("AI分析完成，模型: {}，文章 [{}] typeConfigId={} sentiment={}",
@@ -245,6 +227,27 @@ public class NewsAiAnalysisServiceImpl implements INewsAiAnalysisService
 
         body.put("messages", messages);
         return body;
+    }
+
+    /**
+     * 从 buildRequestBody 构建的 JSONObject 中提取 messages 列表
+     */
+    private java.util.List<java.util.Map<String, String>> extractMessages(JSONObject requestBody)
+    {
+        java.util.List<java.util.Map<String, String>> result = new java.util.ArrayList<>();
+        JSONArray messages = requestBody.getJSONArray("messages");
+        if (messages != null)
+        {
+            for (int i = 0; i < messages.size(); i++)
+            {
+                JSONObject msg = messages.getJSONObject(i);
+                java.util.Map<String, String> map = new java.util.HashMap<>();
+                map.put("role", msg.getString("role"));
+                map.put("content", msg.getString("content"));
+                result.add(map);
+            }
+        }
+        return result;
     }
 
     /**

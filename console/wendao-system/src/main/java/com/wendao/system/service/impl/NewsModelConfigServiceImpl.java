@@ -1,8 +1,6 @@
 package com.wendao.system.service.impl;
 
 import com.alibaba.fastjson2.JSON;
-import com.alibaba.fastjson2.JSONArray;
-import com.alibaba.fastjson2.JSONObject;
 import com.wendao.common.utils.AesEncryptUtils;
 import com.wendao.common.utils.StringUtils;
 import com.wendao.system.domain.NewsModelConfig;
@@ -11,12 +9,7 @@ import com.wendao.system.service.INewsModelConfigService;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.http.HttpEntity;
-import org.springframework.http.HttpHeaders;
-import org.springframework.http.MediaType;
-import org.springframework.http.ResponseEntity;
 import org.springframework.stereotype.Service;
-import org.springframework.web.client.RestTemplate;
 
 import java.util.HashMap;
 import java.util.List;
@@ -38,7 +31,8 @@ public class NewsModelConfigServiceImpl implements INewsModelConfigService
     @Autowired
     private com.wendao.system.cache.ModelConfigCache modelConfigCache;
 
-    private final RestTemplate restTemplate = new RestTemplate();
+    @Autowired
+    private com.wendao.system.utils.AiApiClient aiApiClient;
 
     @Override
     public List<NewsModelConfig> selectList(NewsModelConfig config)
@@ -149,62 +143,27 @@ public class NewsModelConfigServiceImpl implements INewsModelConfigService
             result.put("message", "API Key 解密失败");
             return result;
         }
+        config.setApiKey(apiKey);
 
         try
         {
-            // 构造最小化测试请求
-            JSONObject body = new JSONObject();
-            body.put("model", config.getModelName());
-            body.put("max_tokens", 5);
-            body.put("temperature", 0.1);
-            body.put("stream", false);
-
-            JSONArray messages = new JSONArray();
-            JSONObject userMsg = new JSONObject();
+            // 构造最小化测试消息
+            java.util.List<java.util.Map<String, String>> messages = new java.util.ArrayList<>();
+            java.util.Map<String, String> userMsg = new java.util.HashMap<>();
             userMsg.put("role", "user");
             userMsg.put("content", "hi");
             messages.add(userMsg);
-            body.put("messages", messages);
 
-            HttpHeaders headers = new HttpHeaders();
-            headers.setContentType(MediaType.APPLICATION_JSON);
-            headers.set("Authorization", "Bearer " + apiKey);
+            String content = aiApiClient.callNonStreaming(config, messages, 5, 0.1, false);
 
-            int timeout = config.getTimeoutMs() != null ? config.getTimeoutMs() : 10000;
-            // RestTemplate 默认超时可能不够，简单设置连接超时
-            restTemplate.setRequestFactory(new org.springframework.http.client.SimpleClientHttpRequestFactory() {{
-                setConnectTimeout(timeout);
-                setReadTimeout(timeout);
-            }});
-
-            HttpEntity<String> entity = new HttpEntity<>(body.toJSONString(), headers);
-            ResponseEntity<String> response = restTemplate.postForEntity(
-                    config.getApiUrl(), entity, String.class);
-
-            if (response.getStatusCode().is2xxSuccessful() && response.getBody() != null)
-            {
-                JSONObject respJson = JSON.parseObject(response.getBody());
-                JSONArray choices = respJson.getJSONArray("choices");
-                if (choices != null && !choices.isEmpty())
-                {
-                    String content = choices.getJSONObject(0)
-                            .getJSONObject("message")
-                            .getString("content");
-                    result.put("success", true);
-                    result.put("message", "连接成功，模型响应: " + (content != null ? content : "(空)"));
-                    result.put("modelName", config.getModelName());
-                }
-                else
-                {
-                    result.put("success", false);
-                    result.put("message", "API 返回异常：无 choices 字段，可能接口地址不正确");
-                }
-            }
-            else
-            {
-                result.put("success", false);
-                result.put("message", "HTTP " + response.getStatusCode().value() + "，请检查 API 地址和密钥");
-            }
+            result.put("success", true);
+            result.put("message", "连接成功，模型响应: " + (content != null ? content : "(空)"));
+            result.put("modelName", config.getModelName());
+        }
+        catch (java.io.IOException e)
+        {
+            result.put("success", false);
+            result.put("message", "连接失败：" + e.getMessage());
         }
         catch (org.springframework.web.client.ResourceAccessException e)
         {
