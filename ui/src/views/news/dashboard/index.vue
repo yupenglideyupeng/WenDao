@@ -275,12 +275,17 @@ function renderCharts() {
       sentimentChart = echarts.init(sentimentChartRef.value)
     }
     const sentimentColors: Record<string, string> = { positive: '#67c23a', neutral: '#909399', negative: '#f56c6c' }
+    const sentimentLabels: Record<string, string> = { positive: '积极', neutral: '中性', negative: '消极' }
     sentimentChart.setOption({
       tooltip: { trigger: 'item' },
       series: [{
         type: 'pie',
         radius: '70%',
-        data: stats.value.sentimentDistribution.map((d: any) => ({ ...d, itemStyle: { color: sentimentColors[d.name] || '#909399' } })),
+        data: stats.value.sentimentDistribution.map((d: any) => ({
+          ...d,
+          name: sentimentLabels[d.name] || d.name,
+          itemStyle: { color: sentimentColors[d.name] || '#909399' }
+        })),
         label: { formatter: '{b}: {c}' }
       }]
     })
