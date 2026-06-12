@@ -10,6 +10,7 @@ import org.springframework.web.bind.MethodArgumentNotValidException;
 import org.springframework.web.bind.MissingPathVariableException;
 import org.springframework.web.bind.annotation.ExceptionHandler;
 import org.springframework.web.bind.annotation.RestControllerAdvice;
+import org.springframework.web.context.request.async.AsyncRequestTimeoutException;
 import org.springframework.web.method.annotation.MethodArgumentTypeMismatchException;
 import com.wendao.common.constant.HttpStatus;
 import com.wendao.common.core.domain.AjaxResult;
@@ -132,6 +133,17 @@ public class GlobalExceptionHandler
         log.error(e.getMessage(), e);
         String message = e.getBindingResult().getFieldError().getDefaultMessage();
         return AjaxResult.error(message);
+    }
+
+    /**
+     * SSE异步超时（AsyncRequestTimeoutException）
+     * 注意：此时响应已提交 Content-Type: text/event-stream，不能返回 AjaxResult(JSON)
+     * 只能记录日志，不做额外处理
+     */
+    @ExceptionHandler(AsyncRequestTimeoutException.class)
+    public void handleAsyncRequestTimeoutException(AsyncRequestTimeoutException e, HttpServletRequest request)
+    {
+        log.warn("SSE异步请求超时: {}", request.getRequestURI());
     }
 
     /**
