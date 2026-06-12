@@ -13,11 +13,9 @@ import com.wendao.framework.web.service.TokenService;
 import com.wendao.system.cache.ModelConfigCache;
 import com.wendao.system.config.NewsAiProperties;
 import com.wendao.system.domain.NewsArticle;
-import com.wendao.system.domain.NewsInterpretation;
 import com.wendao.system.domain.NewsModelConfig;
 import com.wendao.system.domain.NewsPromptConfig;
 import com.wendao.system.service.INewsArticleService;
-import com.wendao.system.service.INewsInterpretationService;
 import com.wendao.system.service.INewsPromptConfigService;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -38,7 +36,7 @@ import java.io.OutputStream;
 import java.net.HttpURLConnection;
 import java.net.URL;
 import java.nio.charset.StandardCharsets;
-import java.util.Date;
+
 
 /**
  * 新闻一键解读 SSE 接口
@@ -68,9 +66,6 @@ public class NewsInterpretController extends BaseController
     private INewsArticleService newsArticleService;
 
     @Autowired
-    private INewsInterpretationService interpretationService;
-
-    @Autowired
     private INewsPromptConfigService promptConfigService;
 
     @Autowired
@@ -84,28 +79,6 @@ public class NewsInterpretController extends BaseController
 
     @Autowired
     private com.wendao.system.utils.AiApiClient aiApiClient;
-
-    /**
-     * 查询文章最新解读记录
-     */
-    @PreAuthorize("@ss.hasPermi('news:article:query')")
-    @GetMapping("/interpret/{articleId}/latest")
-    public AjaxResult getLatestInterpretation(@PathVariable Long articleId)
-    {
-        NewsInterpretation record = interpretationService.selectLatestByArticleId(articleId);
-        return success(record);
-    }
-
-    /**
-     * 查询文章所有历史解读记录（按时间倒序）
-     */
-    @PreAuthorize("@ss.hasPermi('news:article:query')")
-    @GetMapping("/interpret/{articleId}/list")
-    public AjaxResult getInterpretationList(@PathVariable Long articleId)
-    {
-        java.util.List<NewsInterpretation> list = interpretationService.selectListByArticleId(articleId);
-        return success(list);
-    }
 
     /**
      * 一键解读 SSE 接口（StreamingResponseBody 真流式）
@@ -138,8 +111,6 @@ public class NewsInterpretController extends BaseController
 
     private void doInterpret(Long articleId, String username, OutputStream outputStream)
     {
-        NewsInterpretation record = null;
-        StringBuilder fullContent = new StringBuilder();
         HttpURLConnection connection = null;
 
         try
@@ -152,7 +123,7 @@ public class NewsInterpretController extends BaseController
                 return;
             }
 
-            // 2. 从缓存获取模型配置（按优先级选第一个 INTERPRET 类型）
+            // 2. 从缓存获取模型配置
             NewsModelConfig modelConfig = modelConfigCache.getModelConfig(PROMPT_TYPE_INTERPRET);
             if (modelConfig == null || StringUtils.isEmpty(modelConfig.getApiKey()))
             {
@@ -160,46 +131,21 @@ public class NewsInterpretController extends BaseController
                 return;
             }
 
-            // 3. 如果上一条记录仍在进行中，标记为已取消
-            NewsInterpretation latest = interpretationService.selectLatestByArticleId(articleId);
-            if (latest != null && "0".equals(latest.getStatus()))
-            {
-                markFailed(latest, "用户重新发起解读，本次已取消");
-            }
-
-            // 4. 查找匹配的提示词配置
+            // 3. 查找匹配的提示词配置
             NewsPromptConfig promptCfg = findPromptConfig(article);
             String systemPrompt = promptCfg != null && StringUtils.isNotEmpty(promptCfg.getSystemPrompt())
                     ? promptCfg.getSystemPrompt()
                     : FALLBACK_INTERPRET_PROMPT;
 
-            // 5. 创建解读记录（status=0 进行中）
-            record = new NewsInterpretation();
-            record.setArticleId(articleId);
-            record.setPromptConfigId(promptCfg != null ? promptCfg.getId() : null);
-            record.setPromptSnapshot(systemPrompt);
-            record.setStatus("0");
-            record.setModelName(modelConfig.getModelName());
-            record.setInterpretCount(latest != null ? latest.getInterpretCount() + 1 : 1);
-            record.setCreateBy(username);
-            interpretationService.insert(record);
-
-            // 6. 通知前端：解读开始
-            JSONObject startData = new JSONObject();
-            startData.put("recordId", record.getId());
-            startData.put("interpretCount", record.getInterpretCount());
-            startData.put("modelName", modelConfig.getModelName());
-            writeEvent(outputStream, "start", startData.toJSONString());
-
-            // 7. 构建消息列表和参数
+            // 4. 构建消息列表和参数
             java.util.List<java.util.Map<String, String>> messages = buildMessages(article, systemPrompt);
             double temperature = resolveTemperature(promptCfg, modelConfig);
             int maxTokens = resolveMaxTokens(promptCfg, modelConfig);
 
-            // 8. 通过 AiApiClient 建立流式连接
+            // 5. 通过 AiApiClient 建立流式连接
             connection = aiApiClient.callStreaming(modelConfig, messages, maxTokens, temperature);
 
-            // 9. 检查 HTTP 状态
+            // 6. 检查 HTTP 状态
             int httpCode = connection.getResponseCode();
             if (httpCode != 200)
             {
@@ -212,13 +158,12 @@ public class NewsInterpretController extends BaseController
                     while ((l = errReader.readLine()) != null) sb.append(l);
                     errBody = sb.toString();
                 }
-                log.error("DeepSeek API 返回错误，状态码={}，body={}", httpCode, errBody);
-                markFailed(record, "AI服务返回异常状态码：" + httpCode);
+                log.error("AI API 返回错误，状态码={}，body={}", httpCode, errBody);
                 writeError(outputStream, "AI服务异常，状态码：" + httpCode);
                 return;
             }
 
-            // 9. 逐行读取流式响应，实时转发给前端
+            // 7. 逐行读取流式响应，实时转发给前端
             try (BufferedReader reader = new BufferedReader(
                     new InputStreamReader(connection.getInputStream(), StandardCharsets.UTF_8)))
             {
@@ -228,24 +173,15 @@ public class NewsInterpretController extends BaseController
                 {
                     if (line.isEmpty()) continue;
 
-                    // 检查流结束标记
                     if (aiApiClient.isStreamDone(line, modelConfig.getApiFormat()))
                     {
                         break;
                     }
 
-                    // 使用 AiApiClient 统一解析增量内容
                     String deltaContent = aiApiClient.parseStreamLine(line, modelConfig.getApiFormat());
-
-                    // 累积完整内容用于落库
-                    if (StringUtils.isNotEmpty(deltaContent))
-                    {
-                        fullContent.append(deltaContent);
-                    }
 
                     if (isAnthropic)
                     {
-                        // Anthropic 格式：将内容块转换为 OpenAI 兼容的 SSE 格式转发给前端
                         if (StringUtils.isNotEmpty(deltaContent))
                         {
                             JSONObject fakeOpenAI = new JSONObject();
@@ -261,11 +197,9 @@ public class NewsInterpretController extends BaseController
                             outputStream.write(eventData.getBytes(StandardCharsets.UTF_8));
                             outputStream.flush();
                         }
-                        // 非内容事件（ping, message_start, content_block_start 等）跳过，不转发
                     }
                     else
                     {
-                        // OpenAI 格式：直接将原始 data: 行转发给前端
                         String eventData = line + "\n\n";
                         outputStream.write(eventData.getBytes(StandardCharsets.UTF_8));
                         outputStream.flush();
@@ -273,13 +207,7 @@ public class NewsInterpretController extends BaseController
                 }
             }
 
-            // 10. 落库：保存完整内容
-            record.setContent(fullContent.toString());
-            record.setStatus("1");
-            record.setUpdateTime(new Date());
-            interpretationService.update(record);
-
-            // 11. 通知前端完成（自定义 done 事件）
+            // 8. 通知前端完成
             JSONObject doneData = new JSONObject();
             doneData.put("modelName", modelConfig.getModelName());
             writeEvent(outputStream, "done", doneData.toJSONString());
@@ -288,10 +216,6 @@ public class NewsInterpretController extends BaseController
         catch (Exception e)
         {
             log.error("解读异常，文章ID={}", articleId, e);
-            if (record != null && record.getId() != null)
-            {
-                markFailed(record, e.getMessage());
-            }
             try
             {
                 writeError(outputStream, "解读过程发生异常：" + e.getMessage());
@@ -393,24 +317,6 @@ public class NewsInterpretController extends BaseController
             if (cfg != null) return cfg;
         }
         return promptConfigService.selectMatch(null, PROMPT_TYPE_INTERPRET);
-    }
-
-    /**
-     * 将记录标记为失败并更新数据库
-     */
-    private void markFailed(NewsInterpretation record, String errMsg)
-    {
-        record.setStatus("2");
-        record.setErrorMsg(StringUtils.substring(errMsg, 0, 500));
-        record.setUpdateTime(new Date());
-        try
-        {
-            interpretationService.update(record);
-        }
-        catch (Exception e)
-        {
-            log.error("更新解读失败状态异常", e);
-        }
     }
 
     /**
