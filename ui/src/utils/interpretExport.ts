@@ -29,7 +29,7 @@ function normalizeMarkdown(text: string): string {
   let result = text.replace(/\r\n/g, '\n').replace(/\r/g, '\n')
   result = result
     .replace(/^(#{1,6})([^\s#])/gm, '$1 $2')
-    .replace(/^(\s*#{1,6}\s+.+?)(#{2,6})([^\s#])/gm, '$1\n$2 $3')
+    .replace(/^(##\s+.+?)(###\s*)/gm, '$1\n### ')
     .replace(/^([*-])([^\s*-])/gm, '$1 $2')
     .replace(/^(\d+\.)([^\s])/gm, '$1 $2')
     .replace(/^(>)([^\s>])/gm, '$1 $2')
@@ -102,8 +102,6 @@ export async function exportToPdf(
   content: string,
   title: string,
   options?: {
-    status?: string
-    interpretCount?: number
     modelName?: string
     createTime?: string
   }
@@ -131,8 +129,6 @@ export async function exportToPdf(
     <div style="border-bottom: 2px solid #409eff; padding-bottom: 16px; margin-bottom: 24px;">
       <h1 style="margin: 0 0 12px 0; font-size: 24px; color: #303133;">${escapeHtml(title)}</h1>
       <div style="font-size: 13px; color: #909399;">
-        ${options?.status === 'done' ? `<span>解读状态：完成</span>` : ''}
-        ${options?.interpretCount ? `<span style="margin-left: 16px;">第 ${options.interpretCount} 次解读</span>` : ''}
         ${options?.modelName ? `<span style="margin-left: 16px;">模型：${escapeHtml(options.modelName)}</span>` : ''}
         ${options?.createTime ? `<span style="margin-left: 16px;">时间：${escapeHtml(options.createTime)}</span>` : ''}
       </div>
@@ -286,8 +282,6 @@ export function exportToHtml(
   content: string,
   title: string,
   options?: {
-    status?: string
-    interpretCount?: number
     modelName?: string
     createTime?: string
   }
@@ -412,8 +406,6 @@ export function exportToHtml(
   <div class="header">
     <h1>${escapeHtml(title)}</h1>
     <div class="meta">
-      ${options?.status === 'done' ? '<span>解读状态：完成</span>' : ''}
-      ${options?.interpretCount ? `<span>第 ${options.interpretCount} 次解读</span>` : ''}
       ${options?.modelName ? `<span>模型：${escapeHtml(options.modelName)}</span>` : ''}
       ${options?.createTime ? `<span>时间：${escapeHtml(options.createTime)}</span>` : ''}
     </div>
