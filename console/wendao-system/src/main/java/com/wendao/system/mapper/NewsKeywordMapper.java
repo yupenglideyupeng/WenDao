@@ -20,8 +20,6 @@ public interface NewsKeywordMapper
 
     public int updateKeyword(NewsKeyword keyword);
 
-    public int updateLastFetchTime(Long id);
-
     public int deleteKeywordById(Long id);
 
     public int deleteKeywordByIds(Long[] ids);
