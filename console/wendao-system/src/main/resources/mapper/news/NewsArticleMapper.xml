@@ -109,8 +109,16 @@ PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
         select
             (select count(*) from news_article where status = '0') as totalArticles,
             (select count(*) from news_article where status = '0' and date(fetch_time) = curdate()) as todayArticles,
-            (select count(*) from news_article a left join news_source s on a.source_id = s.id where a.status = '0' and s.type = '0') as domesticCount,
-            (select count(*) from news_article a left join news_source s on a.source_id = s.id where a.status = '0' and s.type = '1') as foreignCount
+            (select count(*) from news_article a
+                left join news_source s on a.source_id = s.id
+                where a.status = '0'
+                  and (s.type = '0' or (s.type is null and (a.language is null or a.language != 'en')))
+            ) as domesticCount,
+            (select count(*) from news_article a
+                left join news_source s on a.source_id = s.id
+                where a.status = '0'
+                  and (s.type = '1' or (s.type is null and a.language = 'en'))
+            ) as foreignCount
     </select>
 
     <select id="select24HourTimeline" resultType="java.util.HashMap">
@@ -122,11 +130,11 @@ PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
     </select>
 
     <select id="selectSourceDistribution" resultType="java.util.HashMap">
-        select s.name, count(*) as value
+        select COALESCE(s.name, a.source_name, '其他') as name, count(*) as value
         from news_article a
         left join news_source s on a.source_id = s.id
         where a.status = '0'
-        group by a.source_id, s.name
+        group by COALESCE(s.name, a.source_name, '其他')
         order by value desc
     </select>
 
