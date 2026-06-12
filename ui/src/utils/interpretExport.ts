@@ -12,13 +12,85 @@ const md = new MarkdownIt({
 })
 
 // 自定义 fence 渲染：将 ```mermaid 代码块转为 mermaid div
+const mermaidIdCounter = { count: 0 }
 md.renderer.rules.fence = (tokens: any[], idx: number, options: any, env: any, self: any) => {
   const token = tokens[idx]
-  if (token.info.trim() === 'mermaid') {
-    const id = `mermaid-export-${idx}`
+  if (token.info.trim().startsWith('mermaid')) {
+    const id = `mermaid-export-${mermaidIdCounter.count++}`
     return `<div class="mermaid" id="${id}">${token.content}</div>`
   }
   return self.renderToken(tokens, idx, options)
+}
+
+/**
+ * 修复 AI 输出的 Markdown 格式问题（与 Dialog 中 normalizeMarkdown 保持一致）
+ */
+function normalizeMarkdown(text: string): string {
+  let result = text.replace(/\r\n/g, '\n').replace(/\r/g, '\n')
+  result = result
+    .replace(/^(#{1,6})([^\s#])/gm, '$1 $2')
+    .replace(/^([*-])([^\s*-])/gm, '$1 $2')
+    .replace(/^(\d+\.)([^\s])/gm, '$1 $2')
+    .replace(/^(>)([^\s>])/gm, '$1 $2')
+    // 修复 AI 输出中 ```mermaid 不在独立行的问题
+    // 情况1：```mermaid 在行中（如：影响评估```mermaidflowchart TD）
+    //   → 删除不规范的 ```mermaid 前缀，后续由 autoWrapMermaid 统一包裹
+    // 情况2：```mermaid 在行首但代码粘连（如：```mermaidflowchart TD）
+    //   → 删除 mermaid 关键字，保留 ``` 让 MarkdownIt 按普通代码块处理
+    .replace(/([^\n])```mermaid\s*/gi, '$1\n')
+    .replace(/^```mermaid(\S)/gmi, '```$1')
+  result = autoWrapMermaid(result)
+  return result
+}
+
+/**
+ * 自动检测并包裹未用 ```mermaid 包裹的 mermaid 流程图语法
+ */
+function autoWrapMermaid(text: string): string {
+  if (/^```mermaid\b/mi.test(text)) return text
+
+  const lines = text.split('\n')
+  const mermaidLineRegex = /^[\s]*[A-Za-z0-9_\[\]()"'一-鿿]+\s*(-->|---|==>|-\.->)\s*/
+  const graphDeclRegex = /^(graph\s+(TB|TD|BT|RL|LR)|flowchart\s+(TB|TD|BT|RL|LR))/i
+
+  const segments: Array<{ start: number; end: number }> = []
+  let i = 0
+  while (i < lines.length) {
+    if (/^```/.test(lines[i].trim())) {
+      i++
+      while (i < lines.length && !/^```/.test(lines[i].trim())) i++
+      i++
+      continue
+    }
+    const isGraphDecl = graphDeclRegex.test(lines[i].trim())
+    const isMermaidLine = mermaidLineRegex.test(lines[i])
+    if (isGraphDecl || isMermaidLine) {
+      const start = i
+      i++
+      while (i < lines.length) {
+        const trimmed = lines[i].trim()
+        if (trimmed === '' || mermaidLineRegex.test(trimmed)) i++
+        else break
+      }
+      const nonEmptyCount = lines.slice(start, i).filter(l => l.trim() !== '').length
+      if (nonEmptyCount >= 2) segments.push({ start, end: i })
+    } else {
+      i++
+    }
+  }
+  if (segments.length === 0) return text
+
+  const result = [...lines]
+  for (let s = segments.length - 1; s >= 0; s--) {
+    const seg = segments[s]
+    const blockLines = result.slice(seg.start, seg.end)
+    if (!graphDeclRegex.test(blockLines[0].trim())) {
+      blockLines.unshift('flowchart TD')
+    }
+    const wrapped = ['```mermaid', ...blockLines, '```']
+    result.splice(seg.start, seg.end - seg.start, ...wrapped)
+  }
+  return result.join('\n')
 }
 
 /**
@@ -67,7 +139,7 @@ export async function exportToPdf(
   `
 
   // 3. 渲染 Markdown 内容
-  const markdownHtml = md.render(content)
+  const markdownHtml = md.render(normalizeMarkdown(content))
   container.innerHTML = headerHtml + `<div class="markdown-body" style="color: #303133;">${markdownHtml}</div>`
 
   // 4. 添加样式（确保所有文字颜色明确）
@@ -220,7 +292,7 @@ export function exportToHtml(
   }
 ): void {
   // 渲染 Markdown 内容
-  const markdownHtml = md.render(content)
+  const markdownHtml = md.render(normalizeMarkdown(content))
 
   // 构建完整 HTML
   const htmlContent = `<!DOCTYPE html>

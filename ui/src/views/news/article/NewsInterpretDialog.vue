@@ -199,7 +199,7 @@ const md = new MarkdownIt({
 const defaultFence = md.renderer.rules.fence!.bind(md.renderer.rules)
 md.renderer.rules.fence = (tokens: any[], idx: number, options: any, env: any, self: any) => {
   const token = tokens[idx]
-  if (token.info.trim() === 'mermaid') {
+  if (token.info.trim().startsWith('mermaid')) {
     const escaped = md.utils.escapeHtml(token.content)
     return `<div class="mermaid-wrapper"><pre><code class="language-mermaid mermaid">${escaped}</code></pre></div>`
   }
@@ -276,6 +276,13 @@ function normalizeMarkdown(text: string): string {
     .replace(/^(\d+\.)([^\s])/gm, '$1 $2')
     // 修复引用标记后缺少空格：>Text → > Text
     .replace(/^(>)([^\s>])/gm, '$1 $2')
+    // 修复 AI 输出中 ```mermaid 不在独立行的问题
+    // 情况1：```mermaid 在行中（如：影响评估```mermaidflowchart TD）
+    //   → 删除不规范的 ```mermaid 前缀，后续由 autoWrapMermaid 统一包裹
+    // 情况2：```mermaid 在行首但代码粘连（如：```mermaidflowchart TD）
+    //   → 删除 mermaid 关键字，保留 ``` 让 MarkdownIt 按普通代码块处理
+    .replace(/([^\n])```mermaid\s*/gi, '$1\n')
+    .replace(/^```mermaid(\S)/gmi, '```$1')
 
   // 自动检测未包裹的 mermaid 流程图语法并包裹为 ```mermaid 代码块
   result = autoWrapMermaid(result)
@@ -287,8 +294,8 @@ function normalizeMarkdown(text: string): string {
  * 特征：连续多行包含 mermaid 连线符号（-->、---、-.->、==>）且不在已有代码块中
  */
 function autoWrapMermaid(text: string): string {
-  // 如果文本中已包含 ```mermaid，跳过自动包裹
-  if (/```mermaid/i.test(text)) return text
+  // 如果文本中已包含行首 ```mermaid 完整标记（排除 ```mermaidflowchart 粘连），跳过自动包裹
+  if (/^```mermaid\b/mi.test(text)) return text
 
   const lines = text.split('\n')
   const mermaidLineRegex = /^[\s]*[A-Za-z0-9_\[\]()"'一-鿿]+\s*(-->|---|==>|-\.->)\s*/

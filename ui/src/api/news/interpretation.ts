@@ -66,8 +66,8 @@ export function startInterpret(articleId: number, callbacks: InterpretCallbacks)
           const dataStr = line.substring('data:'.length).trim()
 
           if (dataStr === '[DONE]') {
-            // 流结束信号（DeepSeek 原始结束标志，done 事件由后端自定义发送）
-            break
+            // OpenAI 流结束信号，跳过此行继续处理（自定义 done 事件可能在同一 chunk 中）
+            continue
           }
 
           // 尝试解析 JSON
