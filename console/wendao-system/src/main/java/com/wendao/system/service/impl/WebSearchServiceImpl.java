@@ -52,15 +52,27 @@ public class WebSearchServiceImpl implements IWebSearchService
     public List<NewsArticle> searchByKeyword(String keyword)
     {
         List<NewsArticle> allResults = new ArrayList<>();
-
-        // 并行搜索各个来源
         try { allResults.addAll(searchBing(keyword)); } catch (Exception e) { log.warn("Bing搜索失败: {}", e.getMessage()); }
         try { allResults.addAll(searchSogou(keyword)); } catch (Exception e) { log.warn("搜狗搜索失败: {}", e.getMessage()); }
         try { allResults.addAll(searchBilibili(keyword)); } catch (Exception e) { log.warn("B站搜索失败: {}", e.getMessage()); }
         try { allResults.addAll(searchWeibo(keyword)); } catch (Exception e) { log.warn("微博热搜匹配失败: {}", e.getMessage()); }
-
         log.info("关键词 [{}] 搜索完成，共获取 {} 条结果", keyword, allResults.size());
         return allResults;
+    }
+
+    @Override
+    public List<NewsArticle> searchByEngine(String keyword, String engineName)
+    {
+        switch (engineName)
+        {
+            case "Bing搜索":   return searchBing(keyword);
+            case "搜狗搜索":   return searchSogou(keyword);
+            case "B站搜索":   return searchBilibili(keyword);
+            case "微博热搜":   return searchWeibo(keyword);
+            default:
+                log.warn("未知搜索引擎: {}", engineName);
+                return new ArrayList<>();
+        }
     }
 
     // ==================== Bing 搜索 ====================
