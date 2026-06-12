@@ -1,6 +1,6 @@
-# WenDao（闻道）- AI 新闻智能监控平台
+# WenDao（闻道 · 热点洞察）— 关键词驱动的 AI 热点资讯监控平台
 
-基于 **若依（RuoYi-Vue）** 改造的全栈企业级 AI 新闻监控与智能分析平台。集成多源新闻抓取、关键词监控、AI 大模型解读、实时大屏推送等功能。
+基于 **若依（RuoYi-Vue）** 改造的全栈热点资讯监控与 AI 智能分析平台。以关键词为驱动，集成多源资讯抓取、AI 大模型解读、实时大屏推送等功能。
 
 > 后端：Spring Boot 3.5 + MyBatis + Redis + WebSocket  
 > 前端：Vue 3 + TypeScript + Element Plus + ECharts

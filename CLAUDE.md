@@ -4,7 +4,7 @@
 
 ## 项目概述
 
-这是一个基于若依（RuoYi-Vue）改造的 **WenDao-Vue** 快速开发平台——Spring Boot + Vue3 全栈企业级管理系统，并扩展了 AI 新闻智能监控与解读功能。项目分为两个独立的子项目：
+这是一个基于若依（RuoYi-Vue）改造的 **WenDao-Vue（闻道 · 热点洞察）** 快速开发平台——Spring Boot + Vue3 全栈企业级管理系统，并扩展了关键词驱动的 AI 热点资讯监控与解读功能。项目分为两个独立的子项目：
 
 - **`console/`** — Java Spring Boot 后端（WenDao-Vue v3.9.2，Spring Boot 3.5.x，JDK 17）
 - **`ui/`** — Vue 3 + TypeScript + Vite 前端（WenDao-Vue3-TypeScript）
