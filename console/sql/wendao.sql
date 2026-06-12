@@ -1084,9 +1084,9 @@ UPDATE news_article SET fetch_origin = 'KEYWORD' WHERE keyword_id IS NOT NULL;
 UPDATE news_source SET priority='high', fetch_mode='PRIMARY', max_articles_per_fetch=15
   WHERE name IN ('36氪快讯','IT之家');
 
--- 其他来源降级为 SUPPLEMENTARY
+-- 其他来源降级为 SUPPLEMENTARY（保留国外来源为 PRIMARY，只降级国内非主力源）
 UPDATE news_source SET priority='medium', fetch_mode='SUPPLEMENTARY', max_articles_per_fetch=10
-  WHERE fetch_type IN ('RSS','API') AND name NOT IN ('36氪快讯','IT之家');
+  WHERE fetch_type IN ('RSS','API') AND type = '0' AND name NOT IN ('36氪快讯','IT之家');
 
 -- 查询扩展表
 CREATE TABLE IF NOT EXISTS news_query_expansion (
