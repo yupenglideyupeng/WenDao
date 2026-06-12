@@ -31,12 +31,16 @@ dist/
 Thumbs.db
 
 # ====================================================
-# Docker deployment
+# Docker deployment (本地保留，不提交到仓库)
 # ====================================================
+.dockerignore
 .env.docker
-docker/nginx/ssl/*
-docker/nginx/certbot/*
-docker/mysql/init/02-wendao.sql
+.env.docker.example
+Dockerfile.backend
+Dockerfile.frontend
+docker-compose.yml
+docker/
+docs/Docker部署指南.md
 
 # ====================================================
 # Sensitive / Local config
