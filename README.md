@@ -57,7 +57,7 @@
 | **第二层** | AI 评分 | 批量 AI 调用评估文章与 AI/科技领域相关性，输出 relevance 评分（0-100） |
 | **第三层** | 评分后 | `relevance < 阈值`（默认 60）→ 不入库 |
 
-详细流程参见 [docs/news-workflow.md](docs/news-workflow.md)。
+详细流程参见 [news-workflow.md](news-workflow.md)。
 
 ---
 
@@ -119,8 +119,7 @@ WenDao/
 │       │   └── modelConfig/    # 模型管理
 │       └── ...
 │
-└── docs/                       # 文档
-    └── news-workflow.md        # 新闻采集工作流程详解
+└── news-workflow.md            # 新闻采集工作流程详解
 ```
 
 ---
