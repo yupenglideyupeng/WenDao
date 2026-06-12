@@ -270,6 +270,9 @@ function normalizeMarkdown(text: string): string {
   result = result
     // 修复标题标记后缺少空格：##Heading → ## Heading
     .replace(/^(#{1,6})([^\s#])/gm, '$1 $2')
+    // 修复行中连续标题标记：## text###text → ## text\n### text
+    // （AI 常把 ## 和 ### 写在同一行，导致低层级标题样式丢失）
+    .replace(/^(\s*#{1,6}\s+.+?)(#{2,6})([^\s#])/gm, '$1\n$2 $3')
     // 修复列表标记后缺少空格：-Item → - Item
     .replace(/^([*-])([^\s*-])/gm, '$1 $2')
     // 修复有序列表后缺少空格：1.Item → 1. Item
@@ -277,12 +280,12 @@ function normalizeMarkdown(text: string): string {
     // 修复引用标记后缺少空格：>Text → > Text
     .replace(/^(>)([^\s>])/gm, '$1 $2')
     // 修复 AI 输出中 ```mermaid 不在独立行的问题
-    // 情况1：```mermaid 在行中（如：影响评估```mermaidflowchart TD）
-    //   → 删除不规范的 ```mermaid 前缀，后续由 autoWrapMermaid 统一包裹
-    // 情况2：```mermaid 在行首但代码粘连（如：```mermaidflowchart TD）
-    //   → 删除 mermaid 关键字，保留 ``` 让 MarkdownIt 按普通代码块处理
-    .replace(/([^\n])```mermaid\s*/gi, '$1\n')
-    .replace(/^```mermaid(\S)/gmi, '```$1')
+    // 情况A：```mermaid 在行中（如：影响评估```mermaidgraph TD）
+    //   → 确保 ```mermaid 前有换行，但保留标记本身
+    // 情况B：```mermaid 在行首但代码粘连（如：```mermaidgraph TD）
+    //   → 在 mermaid 和代码之间插入换行
+    .replace(/([^\n])```mermaid/gi, '$1\n```mermaid')
+    .replace(/^```mermaid(\S)/gmi, '```mermaid\n$1')
 
   // 自动检测未包裹的 mermaid 流程图语法并包裹为 ```mermaid 代码块
   result = autoWrapMermaid(result)

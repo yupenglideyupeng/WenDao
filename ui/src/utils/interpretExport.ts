@@ -29,16 +29,17 @@ function normalizeMarkdown(text: string): string {
   let result = text.replace(/\r\n/g, '\n').replace(/\r/g, '\n')
   result = result
     .replace(/^(#{1,6})([^\s#])/gm, '$1 $2')
+    .replace(/^(\s*#{1,6}\s+.+?)(#{2,6})([^\s#])/gm, '$1\n$2 $3')
     .replace(/^([*-])([^\s*-])/gm, '$1 $2')
     .replace(/^(\d+\.)([^\s])/gm, '$1 $2')
     .replace(/^(>)([^\s>])/gm, '$1 $2')
     // 修复 AI 输出中 ```mermaid 不在独立行的问题
-    // 情况1：```mermaid 在行中（如：影响评估```mermaidflowchart TD）
-    //   → 删除不规范的 ```mermaid 前缀，后续由 autoWrapMermaid 统一包裹
-    // 情况2：```mermaid 在行首但代码粘连（如：```mermaidflowchart TD）
-    //   → 删除 mermaid 关键字，保留 ``` 让 MarkdownIt 按普通代码块处理
-    .replace(/([^\n])```mermaid\s*/gi, '$1\n')
-    .replace(/^```mermaid(\S)/gmi, '```$1')
+    // 情况A：```mermaid 在行中（如：影响评估```mermaidgraph TD）
+    //   → 确保 ```mermaid 前有换行，但保留标记本身
+    // 情况B：```mermaid 在行首但代码粘连（如：```mermaidgraph TD）
+    //   → 在 mermaid 和代码之间插入换行
+    .replace(/([^\n])```mermaid/gi, '$1\n```mermaid')
+    .replace(/^```mermaid(\S)/gmi, '```mermaid\n$1')
   result = autoWrapMermaid(result)
   return result
 }
