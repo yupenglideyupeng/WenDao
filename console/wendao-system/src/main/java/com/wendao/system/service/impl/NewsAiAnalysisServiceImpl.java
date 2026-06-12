@@ -404,4 +404,172 @@ public class NewsAiAnalysisServiceImpl implements INewsAiAnalysisService
 
         return null;
     }
+
+    // ===================================================================
+    // 批量相关性评分（入库前同步调用，1次AI评N篇）
+    // ===================================================================
+
+    private static final String BATCH_SCORE_PROMPT =
+        "你是一个新闻相关性评估专家。请评估以下新闻标题与AI/科技领域的相关性。\n" +
+        "对每条新闻，返回 relevance(0-100，越高越相关，不相关给低分)、isReal(true/false，是否真实新闻)、importance(low/medium/high/urgent)、reason(简要理由)。\n" +
+        "严格返回JSON数组格式，不要包含任何额外文字、解释或markdown格式：\n" +
+        "[{\"index\":0,\"relevance\":85,\"isReal\":true,\"importance\":\"high\",\"reason\":\"...\"}, ...]\n" +
+        "index必须与输入的编号对应。";
+
+    @Override
+    public List<INewsAiAnalysisService.RelevanceScore> batchScoreRelevance(List<NewsArticle> articles)
+    {
+        if (articles == null || articles.isEmpty()) return java.util.Collections.emptyList();
+
+        // AI 未启用时默认全部放行（60分）
+        if (!properties.isEnabled())
+        {
+            log.debug("AI分析未启用，批量评分默认放行 {} 篇", articles.size());
+            return defaultPassAll(articles);
+        }
+
+        // 获取模型配置
+        NewsModelConfig modelConfig = modelConfigCache.getModelConfig("ANALYSIS");
+        if (modelConfig == null || StringUtils.isEmpty(modelConfig.getApiKey()))
+        {
+            log.debug("无可用AI模型配置，批量评分默认放行 {} 篇", articles.size());
+            return defaultPassAll(articles);
+        }
+
+        try
+        {
+            // 构建批量评分 prompt
+            String prompt = buildBatchScorePrompt(articles);
+
+            // 构建 messages
+            int maxTokens = 200 + articles.size() * 80;
+            double temperature = 0.3;
+            boolean jsonMode = modelConfig.getSupportJsonMode() != null && modelConfig.getSupportJsonMode() == 1;
+
+            java.util.List<java.util.Map<String, String>> messages = new java.util.ArrayList<>();
+            java.util.Map<String, String> sysMsg = new java.util.HashMap<>();
+            sysMsg.put("role", "system");
+            sysMsg.put("content", prompt);
+            messages.add(sysMsg);
+
+            java.util.Map<String, String> userMsg = new java.util.HashMap<>();
+            userMsg.put("role", "user");
+            userMsg.put("content", buildBatchScoreUserContent(articles));
+            messages.add(userMsg);
+
+            String response = aiApiClient.callNonStreaming(modelConfig, messages, maxTokens, temperature, jsonMode);
+
+            return parseBatchScoreResult(response, articles.size());
+        }
+        catch (Exception e)
+        {
+            log.error("批量AI评分失败，丢弃 {} 篇文章", articles.size(), e);
+            return java.util.Collections.emptyList();
+        }
+    }
+
+    private String buildBatchScorePrompt(List<NewsArticle> articles)
+    {
+        return BATCH_SCORE_PROMPT;
+    }
+
+    private String buildBatchScoreUserContent(List<NewsArticle> articles)
+    {
+        StringBuilder sb = new StringBuilder("新闻列表：\n");
+        for (int i = 0; i < articles.size(); i++)
+        {
+            sb.append("[").append(i).append("] ").append(articles.get(i).getTitle()).append("\n");
+        }
+        return sb.toString();
+    }
+
+    private List<INewsAiAnalysisService.RelevanceScore> parseBatchScoreResult(String aiContent, int expectedSize)
+    {
+        String jsonStr = extractJsonArray(aiContent);
+        if (jsonStr == null)
+        {
+            log.warn("批量评分AI返回无法解析，原始内容前200字: {}",
+                    aiContent != null ? aiContent.substring(0, Math.min(aiContent.length(), 200)) : "null");
+            return java.util.Collections.emptyList();
+        }
+        try
+        {
+            com.alibaba.fastjson2.JSONArray arr = com.alibaba.fastjson2.JSON.parseArray(jsonStr);
+            java.util.List<INewsAiAnalysisService.RelevanceScore> result = new java.util.ArrayList<>();
+            for (int i = 0; i < arr.size(); i++)
+            {
+                com.alibaba.fastjson2.JSONObject item = arr.getJSONObject(i);
+                INewsAiAnalysisService.RelevanceScore score = new INewsAiAnalysisService.RelevanceScore();
+                score.setIndex(item.getIntValue("index"));
+                score.setRelevance(Math.min(100, Math.max(0, item.getIntValue("relevance"))));
+                score.setReal(Boolean.TRUE.equals(item.getBoolean("isReal")));
+                score.setImportance(item.getString("importance"));
+                score.setReason(item.getString("reason"));
+                result.add(score);
+            }
+            // 按 index 排序确保与输入顺序一致
+            result.sort(java.util.Comparator.comparingInt(INewsAiAnalysisService.RelevanceScore::getIndex));
+            return result;
+        }
+        catch (Exception e)
+        {
+            log.warn("批量评分JSON解析失败: {}", e.getMessage());
+            return java.util.Collections.emptyList();
+        }
+    }
+
+    /**
+     * 从 AI 返回内容中提取 JSON 数组字符串
+     */
+    private String extractJsonArray(String content)
+    {
+        if (StringUtils.isEmpty(content)) return null;
+        String trimmed = content.trim();
+
+        // 直接是 JSON 数组
+        if (trimmed.startsWith("["))
+        {
+            try { com.alibaba.fastjson2.JSON.parseArray(trimmed); return trimmed; }
+            catch (Exception ignored) {}
+        }
+
+        // markdown 代码块包裹
+        if (trimmed.contains("```"))
+        {
+            String stripped = trimmed.replaceAll("```json\\s*", "").replaceAll("```\\s*", "").trim();
+            if (stripped.startsWith("["))
+            {
+                try { com.alibaba.fastjson2.JSON.parseArray(stripped); return stripped; }
+                catch (Exception ignored) {}
+            }
+        }
+
+        // 查找第一个 [ 到最后一个 ]
+        int start = trimmed.indexOf('[');
+        int end = trimmed.lastIndexOf(']');
+        if (start >= 0 && end > start)
+        {
+            String candidate = trimmed.substring(start, end + 1);
+            try { com.alibaba.fastjson2.JSON.parseArray(candidate); return candidate; }
+            catch (Exception ignored) {}
+        }
+
+        return null;
+    }
+
+    private List<INewsAiAnalysisService.RelevanceScore> defaultPassAll(List<NewsArticle> articles)
+    {
+        java.util.List<INewsAiAnalysisService.RelevanceScore> result = new java.util.ArrayList<>();
+        for (int i = 0; i < articles.size(); i++)
+        {
+            INewsAiAnalysisService.RelevanceScore s = new INewsAiAnalysisService.RelevanceScore();
+            s.setIndex(i);
+            s.setRelevance(60);
+            s.setReal(true);
+            s.setImportance("low");
+            s.setReason("AI未启用，默认放行");
+            result.add(s);
+        }
+        return result;
+    }
 }
