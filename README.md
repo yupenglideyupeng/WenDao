@@ -9,47 +9,44 @@
 
 ## 🚀 核心功能
 
-### 📡 AI 新闻模块（核心业务）
+### 📡 AI 新闻模块
 
 | 功能 | 说明 |
 |------|------|
-| **实时大屏** | WebSocket 实时推送新闻，ECharts 可视化（来源分布、情感分析、24h 趋势），在线客户端计数 |
-| **新闻源管理** | 支持 RSS / API / 爬虫 / 搜索引擎四种抓取方式，主力+辅助双模式调度 |
-| **文章管理** | 多条件筛选（标题/类型/语言/情感/推送状态），关联度评分，支持手动推送大屏 |
-| **关键词监控** | 关键词驱动抓取，查询扩展（自动生成相关搜索词），关联度阈值过滤 |
-| **AI 智能解读** | SSE 流式输出，Markdown 渲染 + Mermaid 流程图，多版本历史切换，导出 PDF/HTML |
-| **提示词配置** | 支持 ANALYSIS / INTERPRET / AGGREGATE / COMPARE 四种类型，多对多关联新闻类型 |
+| **实时大屏** | WebSocket 实时推送新闻，ECharts 可视化（来源分布、情感分析、24h 趋势），在线客户端计数，国内外来源统计 |
+| **新闻源管理** | 支持 RSS / API / 爬虫 / 搜索引擎四种抓取方式，主力(PRIMARY)+辅助(SUPPLEMENTARY)双模式调度 |
+| **文章管理** | 多条件筛选（标题/类型/语言/情感/推送状态），关联度评分，一键 AI 解读 |
+| **关键词监控** | 关键词驱动过滤，关联度阈值控制（低于阈值自动下架） |
+| **AI 智能解读** | SSE 流式输出，Markdown 渲染 + Mermaid 流程图，导出 PDF/HTML |
+| **提示词配置** | 支持 ANALYSIS / INTERPRET 等多种类型，多对多关联新闻类型，自定义 temperature/maxTokens |
 | **模型管理** | 多厂商支持（DeepSeek / 硅基流动 / 阿里百炼 / 智谱 GLM / 火山引擎 / 自定义），API Key AES 加密存储，连接测试，按优先级+场景自动匹配，支持 OpenAI / Anthropic 双 API 格式 |
+| **新闻类型配置** | 自定义新闻分类（如 AI科技、财经、医疗等），AI 自动分类 |
 
-### 📰 新闻采集工作流程
+### 📰 新闻采集流程
 
 ```
 定时任务 (每5分钟)
     │
-    ├── ① 新闻源抓取 (fetchPrimarySources)
-    │       └── 仅 PRIMARY 模式的新闻源（RSS/API/CRAWL）
-    │            → 标题关键词匹配过滤
-    │
-    └── ② 关键词搜索 (fetchByKeywords)
-            └── 所有激活的关键词
-                 → AI 查询扩展（同义词生成）
-                 → 多引擎搜索（Bing / 搜狗 / B站 / 微博）
-                 → 原始关键词匹配过滤
-                    │
-                    ▼
-            ③ 去重 & 入库 (news_article)
-                    │
-                    ▼
-            ④ 异步 AI 分析 → 深度评分（摘要/标签/情感/类型/relevance）
-                    │
-                    ▼
-            ⑤ 相关性阈值过滤（relevance ≥ 60 → status=0，< 60 → status=1 下架）
-                    │
-                    ▼
-            ⑥ WebSocket 实时推送（仅 status=0）
-                    │
-                    ▼
-            ⑦ 前端展示（文章列表 / 大屏看板 / 一键解读 SSE 流式）
+    └── 抓取 PRIMARY 模式新闻源
+         ├── RSS 源  → 解析 XML 提取标题/链接/摘要
+         ├── API 源  → 调用 REST API (HackerNews/知乎/微博)
+         ├── CRAWL 源 → Jsoup 爬取网页
+         └── SEARCH 源 → 遍历关键词，AI扩展后调用搜索引擎(Bing/搜狗/B站/微博)
+              │
+              ▼
+         ① 标题关键词匹配过滤（第一层）
+              │
+              ▼
+         ② 批量 AI 相关性评分（第二层）
+              │
+              ▼
+         ③ 阈值过滤 → 低于阈值不入库（第三层）
+              │
+              ▼
+         ④ 入库 + 异步 AI 分析（摘要/标签/情感/分类）
+              │
+              ▼
+         ⑤ WebSocket 实时推送
 ```
 
 **三层过滤机制：**
@@ -57,45 +54,10 @@
 | 层级 | 位置 | 说明 |
 |---|---|---|
 | **第一层** | 入库前 | 标题必须包含激活关键词（中文子串匹配 / 英文短词独立单词边界匹配），不匹配直接丢弃 |
-| **第二层** | AI 分析 | AI 模型综合评估文章相关性，输出 `relevance` 评分（0-100） |
-| **第三层** | AI 分析后 | `relevance < 阈值`（默认 60）→ `status=1` 自动下架，前端不可见 |
-
-**英文短词单词边界匹配：** 关键词长度 < 4 时（如 "AI"），使用单词边界检查，防止 "AI" 误匹配 "DETAIL"、"SHANGHAI" 等单词中的 "ai" 子串。
+| **第二层** | AI 评分 | 批量 AI 调用评估文章与 AI/科技领域相关性，输出 relevance 评分（0-100） |
+| **第三层** | 评分后 | `relevance < 阈值`（默认 60）→ 不入库 |
 
 详细流程参见 [docs/news-workflow.md](docs/news-workflow.md)。
-
-### 🏗️ 系统管理
-
-| 模块 | 功能 |
-|------|------|
-| **用户管理** | 用户 CRUD、角色分配、部门归属、状态控制 |
-| **角色管理** | 角色 CRUD、菜单权限分配、数据权限范围 |
-| **菜单管理** | 菜单树维护、按钮权限、路由配置 |
-| **部门管理** | 组织架构树 |
-| **岗位管理** | 岗位字典维护 |
-| **字典管理** | 字典类型+数据维护（如模型提供商、新闻类型等） |
-| **参数配置** | 系统参数键值对管理 |
-| **通知公告** | 系统通知发布与已读追踪 |
-
-### 📊 系统监控
-
-| 功能 | 说明 |
-|------|------|
-| **在线用户** | 当前登录用户列表，支持强退 |
-| **定时任务** | Quartz 任务调度，支持 Cron 表达式，执行日志 |
-| **数据监控** | Druid 连接池监控 |
-| **服务监控** | 服务器 CPU/内存/磁盘/JVM 信息 |
-| **缓存监控** | Redis 缓存键值查看与清理 |
-| **操作日志** | 接口调用日志（@Log 注解记录） |
-| **登录日志** | 登录历史与异常记录 |
-
-### 🛠️ 开发工具
-
-| 功能 | 说明 |
-|------|------|
-| **代码生成** | 数据库表 → Java/Vue/SQL 一键生成，支持 Velocity 模板自定义 |
-| **表单构建** | 拖拽式表单设计器 |
-| **API 文档** | SpringDoc / Swagger 在线文档 |
 
 ---
 
@@ -105,35 +67,29 @@
 
 | 技术 | 版本 | 说明 |
 |------|------|------|
-| Spring Boot | 3.5.11 | 核心框架 |
-| MyBatis | 3.0.5 | ORM 框架 |
+| Spring Boot | 3.5.x | 核心框架 |
+| MyBatis | 3.0.x | ORM 框架 |
 | MySQL | 8.0+ | 关系型数据库 |
 | Redis | 6.0+ | 缓存 & Token 存储 |
-| Druid | 1.2.28 | 数据库连接池 |
+| Druid | 1.2.x | 数据库连接池 |
 | Spring Security | 6.x | 认证 & 授权 |
 | JWT | 0.9.1 | 无状态 Token 鉴权 |
 | Quartz | 2.4.x | 定时任务调度 |
 | WebSocket | - | 实时消息推送 |
-| SpringDoc | 2.8.16 | API 文档 |
-| FastJSON2 | 2.0.61 | JSON 序列化 |
-| Apache POI | 4.1.2 | Excel 导入导出 |
+| SpringDoc | 2.8.x | API 文档 |
 
 ### 前端
 
 | 技术 | 版本 | 说明 |
 |------|------|------|
-| Vue | 3.5.26 | 渐进式框架 |
-| TypeScript | 5.6.3 | 类型安全 |
-| Vite | 6.4.1 | 构建工具 |
-| Element Plus | 2.13.1 | UI 组件库 |
-| Pinia | 3.0.4 | 状态管理 |
-| Vue Router | 4.6.4 | 路由管理 |
-| ECharts | 5.6.0 | 数据可视化 |
-| Axios | 1.13.2 | HTTP 客户端 |
-| markdown-it | 14.2.0 | Markdown 渲染 |
-| Mermaid | 11.15.0 | 流程图渲染 |
-| jsPDF | 4.2.1 | PDF 导出 |
-| html2canvas | 1.4.1 | HTML 截图 |
+| Vue | 3.5.x | 渐进式框架 |
+| TypeScript | 5.6.x | 类型安全 |
+| Vite | 6.x | 构建工具 |
+| Element Plus | 2.13.x | UI 组件库 |
+| Pinia | 3.x | 状态管理 |
+| ECharts | 5.6.x | 数据可视化 |
+| markdown-it | 14.x | Markdown 渲染 |
+| Mermaid | 11.x | 流程图渲染 |
 
 ---
 
@@ -141,41 +97,30 @@
 
 ```
 WenDao/
-├── console/                          # 后端 Maven 多模块项目
-│   ├── wendao-admin/                 # 入口模块：启动类、Controller、application.yml
-│   ├── wendao-framework/             # 核心框架：Security、JWT、AOP、WebSocket、全局异常
-│   ├── wendao-system/                # 业务模块：Service、Mapper、Domain
-│   ├── wendao-quartz/                # 定时任务模块
-│   ├── wendao-generator/             # 代码生成器
-│   ├── wendao-common/                # 公共模块：注解、工具类、BaseEntity
-│   └── sql/                          # 数据库脚本
-│       ├── wendao.sql                # 一键初始化脚本（合并版）
+├── console/                    # 后端 Maven 多模块项目
+│   ├── wendao-admin/           # 入口模块：Controller、application.yml
+│   ├── wendao-framework/       # 核心框架：Security、JWT、AOP、WebSocket
+│   ├── wendao-system/          # 业务模块：Service、Mapper、Domain
+│   ├── wendao-quartz/          # 定时任务模块
+│   ├── wendao-generator/       # 代码生成器
+│   ├── wendao-common/          # 公共模块：注解、工具类、BaseEntity
+│   └── sql/                    # 数据库脚本（wendao.sql 一键初始化）
 │
-├── ui/                               # 前端 Vue3 项目
+├── ui/                         # 前端 Vue3 项目
 │   └── src/
-│       ├── api/                      # API 请求模块
-│       │   ├── news/                 # 新闻模块 API
-│       │   └── system/               # 系统模块 API
-│       ├── views/                    # 页面组件
-│       │   ├── news/                 # AI 新闻页面
-│       │   │   ├── dashboard/        # 实时大屏
-│       │   │   ├── article/          # 文章管理 + AI 解读弹窗
-│       │   │   ├── source/           # 新闻源管理
-│       │   │   ├── keyword/          # 关键词监控
-│       │   │   ├── typeConfig/       # 新闻类型配置
-│       │   │   ├── promptConfig/     # 提示词配置
-│       │   │   └── modelConfig/      # 模型管理
-│       │   ├── system/               # 系统管理页面
-│       │   ├── monitor/              # 监控页面
-│       │   └── tool/                 # 开发工具页面
-│       ├── components/               # 公共组件
-│       ├── layout/                   # 布局组件
-│       ├── router/                   # 路由配置
-│       ├── store/                    # Pinia 状态管理
-│       ├── types/                    # TypeScript 类型定义
-│       └── utils/                    # 工具函数
+│       ├── api/news/           # 新闻模块 API
+│       ├── views/news/         # 新闻页面
+│       │   ├── dashboard/      # 实时大屏
+│       │   ├── article/        # 文章管理 + AI 解读
+│       │   ├── source/         # 新闻源管理
+│       │   ├── keyword/        # 关键词监控
+│       │   ├── typeConfig/     # 新闻类型配置
+│       │   ├── promptConfig/   # 提示词配置
+│       │   └── modelConfig/    # 模型管理
+│       └── ...
 │
-└── CLAUDE.md                         # 开发指南
+└── docs/                       # 文档
+    └── news-workflow.md        # 新闻采集工作流程详解
 ```
 
 ---
@@ -193,40 +138,36 @@ WenDao/
 
 ### 1. 初始化数据库
 
-执行合并后的 SQL 脚本：
-
 ```bash
-mysql -u root -p -e "CREATE DATABASE IF NOT EXISTS \`ry-vue\` DEFAULT CHARACTER SET utf8mb4 COLLATE utf8mb4_general_ci"
-mysql -u root -p ry-vue < console/sql/wendao.sql
+mysql -u root -p -e "CREATE DATABASE IF NOT EXISTS wendao DEFAULT CHARACTER SET utf8mb4 COLLATE utf8mb4_general_ci"
+mysql -u root -p wendao < console/sql/wendao.sql
 ```
 
 ### 2. 配置后端
 
-编辑 `console/wendao-admin/src/main/resources/application-druid.yml`，修改数据库和 Redis 连接信息：
+编辑 `console/wendao-admin/src/main/resources/application-druid.yml`，修改数据库和 Redis 连接：
 
 ```yaml
 spring:
   datasource:
     druid:
       master:
-        url: jdbc:mysql://localhost:3306/ry-vue?useUnicode=true&characterEncoding=utf8
+        url: jdbc:mysql://localhost:3306/wendao?useUnicode=true&characterEncoding=utf8&serverTimezone=GMT%2B8
         username: root
         password: your_password
-  redis:
-    host: localhost
-    port: 6379
-    database: 3
+  data:
+    redis:
+      host: localhost
+      port: 6379
+      database: 4
 ```
 
 ### 3. 启动后端
 
 ```bash
 cd console
-
-# 方式一：Maven 直接启动
 mvn spring-boot:run
-
-# 方式二：打包后启动
+# 或打包后启动
 mvn clean package -Dmaven.test.skip=true
 java -jar wendao-admin/target/wendao-admin.jar
 ```
@@ -237,22 +178,96 @@ java -jar wendao-admin/target/wendao-admin.jar
 
 ```bash
 cd ui
-
-# 安装依赖
 yarn --registry=https://registry.npmmirror.com
-
-# 启动开发服务器
 yarn dev
 ```
 
-前端默认运行在 `http://localhost:80`，开发模式下 API 请求自动代理到 `localhost:8080`
+前端默认运行在 `http://localhost:80`，API 自动代理到 `localhost:8080`
 
-### 5. 登录系统
-
-打开浏览器访问 `http://localhost`，使用默认账号登录：
+### 5. 登录
 
 - **用户名：** `admin`
 - **密码：** `admin123`
+
+---
+
+## 📋 新闻模块配置指南（首次使用必读）
+
+按以下顺序依次配置，后续可随时调整：
+
+### 第一步：模型管理（news/modelConfig）
+
+配置 AI 大模型连接信息，系统支持多个模型按优先级+场景自动匹配。
+
+| 配置项 | 说明 | 示例 |
+|--------|------|------|
+| 配置名称 | 自定义标识 | "DeepSeek主模型" |
+| 提供商 | 厂商 | DEEPSEEK / SILICONFLOW / BAILIAN / ZHIPU / VOLCENGINE / CUSTOM |
+| API地址 | 接口地址 | `https://api.deepseek.com/v1/chat/completions` |
+| API密钥 | 密钥（AES加密存储） | `sk-xxxx` |
+| 模型名称 | 模型标识 | `deepseek-chat` |
+| 优先级 | 数字越小越优先 | 1 |
+| 适用场景 | 逗号分隔 | `INTERPRET,ANALYSIS` |
+| API格式 | OpenAI/Anthropic | OPENAI |
+| 支持流式 | SSE流式输出 | ✅ |
+| 支持JSON模式 | 结构化输出 | ✅ |
+
+> **INTERPRET** = 一键解读（需支持流式）  
+> **ANALYSIS** = 文章分析（摘要/标签/情感/分类/相关性评分）  
+> **ALL** = 所有场景
+
+### 第二步：新闻类型配置（news/typeConfig）
+
+定义新闻分类，AI 分析时会自动归类。
+
+| 配置项 | 说明 | 示例 |
+|--------|------|------|
+| 类型编码 | 唯一标识 | `ai_tech` |
+| 类型名称 | 显示名称 | AI科技 |
+| 是否启用 | 启用后AI才会使用此分类 | ✅ |
+
+### 第三步：提示词配置（news/promptConfig）
+
+配置 AI 提示词模板，控制 AI 输出内容和风格。
+
+| 配置项 | 说明 |
+|--------|------|
+| 提示词名称 | 自定义标识 |
+| 类型 | INTERPRET（解读）/ ANALYSIS（分析） |
+| 关联新闻类型 | 多对多，可为空（全局匹配） |
+| System Prompt | 系统提示词，定义 AI 角色和输出要求 |
+| Temperature | 创造性控制（0-1，越低越稳定） |
+| Max Tokens | 最大输出长度 |
+
+### 第四步：新闻源管理（news/source）
+
+配置数据来源，系统定时抓取。
+
+| 配置项 | 说明 | 示例 |
+|--------|------|------|
+| 来源名称 | 自定义标识 | "IT之家" |
+| 来源类型 | 国内/国外 | 国内(type=0) |
+| 来源地址 | RSS/API/网页 URL | `https://www.ithome.com/rss/` |
+| 抓取方式 | RSS / API / CRAWL / SEARCH | RSS |
+| 抓取模式 | PRIMARY=主力 / SUPPLEMENTARY=辅助 | PRIMARY |
+| 优先级 | high / medium / low | high |
+| 每次抓取数 | 每次最多入库篇数 | 15 |
+
+> **只有 PRIMARY 模式的来源**会被定时任务抓取。SUPPLEMENTARY 来源作为备用，可手动触发。  
+> **SEARCH 类型**的来源通过关键词遍历搜索，不走 RSS/API 抓取。
+
+### 第五步：关键词监控（news/keyword）
+
+配置监控关键词，用于标题匹配过滤。
+
+| 配置项 | 说明 | 默认值 |
+|--------|------|--------|
+| 关键词 | 监控的关键词文本 | 必填 |
+| 分类 | 可选分类标签 | - |
+| 是否启用 | 启用后参与过滤 | ✅ |
+| 相关性阈值 | 低于此值的文章自动下架 | **60**（最低60） |
+
+> 关键词仅负责**过滤**，不再独立驱动搜索。所有搜索由 SEARCH 类型的新闻源驱动。
 
 ---
 
@@ -260,34 +275,25 @@ yarn dev
 
 ### AES 加密密钥
 
-`application.yml` 中的 `wendao.aes-key` 用于加密数据库中存储的 API Key 等敏感字段：
+```yaml
+wendao:
+  aes-key: WenDao2026!AesKey#Secret@9876  # 必须是 32 字符，用于加密 API Key
+```
+
+### 文件上传路径
 
 ```yaml
 wendao:
-  aes-key: WenDao2026!AesKey#Secret@9876  # 必须是 32 字符
+  profile: D:/wendao/uploadPath
 ```
 
-### AI 新闻模块配置
-
-AI 模型配置已迁移至数据库 `news_model_config` 表，通过管理界面"新闻管理 → 模型管理"进行配置，支持 Redis 缓存（5分钟 TTL）。
+### SSE 流式超时
 
 ```yaml
-news:
-  fetch-interval-ms: 300000       # 新闻抓取间隔（毫秒）
-  query-expansion:
-    enabled: true                  # 是否启用 AI 查询扩展
-    max-terms: 3                   # 最大扩展词数
-  ai:
-    enabled: true                  # 是否启用 AI 分析
-```
-
-每个关键词可单独配置 `relevance_threshold`（默认 **60**，范围 0-100），低于阈值的文章自动下架。
-
-### 文件上传
-
-```yaml
-wendao:
-  profile: D:/wendao/uploadPath    # 上传文件存储路径
+spring:
+  mvc:
+    async:
+      request-timeout: 300000  # 5分钟，避免长解读被截断
 ```
 
 ---
@@ -296,18 +302,15 @@ wendao:
 
 - **认证方式：** 无状态 JWT Token（Header: `Authorization: Bearer <token>`，30 分钟过期）
 - **权限模型：** RBAC（用户 → 角色 → 菜单/按钮权限）
-- **数据权限：** 支持按部门/岗位等维度进行行级数据过滤（`@DataScope` 注解）
-- **接口防护：** 支持限流（`@RateLimiter`）、防重复提交（`@RepeatSubmit`）、XSS 过滤
+- **数据权限：** 支持按部门/岗位进行行级数据过滤（`@DataScope` 注解）
+- **接口防护：** 限流（`@RateLimiter`）、防重复提交（`@RepeatSubmit`）、XSS 过滤
 
 ---
 
 ## 📡 WebSocket 实时推送
 
-新闻大屏通过 WebSocket 实现实时推送：
-
 - **连接地址：** `ws://localhost:8080/ws/news?token=<jwt_token>`
 - **心跳机制：** 客户端发送 `ping`，服务端回复 `pong`
-- **推送事件：** 新文章抓取完成后自动通过 `@EventListener` 广播 `NEW_ARTICLE` 消息
 - **消息格式：**
   ```json
   {
@@ -321,20 +324,11 @@ wendao:
 
 ## 🧪 API 文档
 
-启动后端后访问：
-
 - Swagger UI：`http://localhost:8080/swagger-ui.html`
-- OpenAPI JSON：`http://localhost:8080/v3/api-docs`
 - Druid 监控：`http://localhost:8080/druid/`（账号：`wendao` / 密码：`123456`）
 
 ---
 
 ## 📝 开发指南
 
-详见 [CLAUDE.md](./CLAUDE.md)，包含：
-
-- 后端模块架构与分层说明
-- 前端动态路由与权限控制原理
-- 全栈开发工作流
-- 自定义注解使用说明
-- 代码生成器使用指南
+详见 [CLAUDE.md](./CLAUDE.md)，包含后端模块架构、前端动态路由、全栈开发工作流等。
