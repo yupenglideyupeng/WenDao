@@ -214,6 +214,7 @@ public class NewsFetcherServiceImpl implements INewsFetcherService
             article.setReadCount(0);
             article.setStatus("0");
             article.setFetchOrigin("SOURCE");
+            article.setTags("[]");
             if (StringUtils.isEmpty(article.getLanguage()))
             {
                 article.setLanguage(isForeignSource ? "en" : "zh");
@@ -320,6 +321,7 @@ public class NewsFetcherServiceImpl implements INewsFetcherService
                             article.setReadCount(0);
                             article.setStatus("0");
                             article.setFetchOrigin("SOURCE");
+                            article.setTags("[]");
                             if (StringUtils.isEmpty(article.getLanguage()))
                             {
                                 article.setLanguage("zh");
@@ -462,7 +464,19 @@ public class NewsFetcherServiceImpl implements INewsFetcherService
                     Element item = (Element) items.item(i);
                     NewsArticle article = new NewsArticle();
                     article.setTitle(getElementText(item, "title"));
-                    article.setOriginalUrl(getElementText(item, "link"));
+                    // 处理 link：RSS <link>text</link>，Atom <link href="..."/>
+                    String linkText = getElementText(item, "link");
+                    if (StringUtils.isEmpty(linkText))
+                    {
+                        // Atom 格式：<link href="..."/> 或 <link rel="alternate" href="..."/>
+                        NodeList linkNodes = item.getElementsByTagName("link");
+                        if (linkNodes.getLength() > 0)
+                        {
+                            Element linkEl = (Element) linkNodes.item(0);
+                            linkText = linkEl.getAttribute("href");
+                        }
+                    }
+                    article.setOriginalUrl(linkText);
                     article.setSummary(getElementText(item, "description"));
                     if (StringUtils.isEmpty(article.getSummary()))
                         article.setSummary(getElementText(item, "summary"));
@@ -731,6 +745,9 @@ public class NewsFetcherServiceImpl implements INewsFetcherService
 
     /**
      * 按来源语言过滤匹配关键词列表
+     * <p>
+     * 国内源：匹配所有关键词（中英文都匹配，因为中文科技新闻中常出现 AI、GPT 等英文词）
+     * 国外源：只匹配非中文关键词
      */
     private List<NewsKeyword> filterKeywordsByLanguage(List<NewsKeyword> keywords, boolean isForeignSource)
     {
@@ -739,8 +756,10 @@ public class NewsFetcherServiceImpl implements INewsFetcherService
         for (NewsKeyword kw : keywords)
         {
             boolean kwIsChinese = containsChinese(kw.getText());
-            if (isForeignSource && !kwIsChinese) result.add(kw);
-            else if (!isForeignSource && kwIsChinese) result.add(kw);
+            // 国内源：中英文关键词都保留
+            if (!isForeignSource) result.add(kw);
+            // 国外源：只保留非中文关键词
+            else if (!kwIsChinese) result.add(kw);
         }
         return result;
     }
