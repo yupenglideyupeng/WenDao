@@ -876,7 +876,7 @@ CREATE TABLE `news_source`
     `name`            VARCHAR(100) NOT NULL COMMENT '来源名称（如 Hacker News、知乎热榜）',
     `type`            CHAR(1)      NOT NULL DEFAULT '0' COMMENT '来源类型：0=国内 1=国外',
     `url`             VARCHAR(500) NOT NULL COMMENT '新闻源地址（API/RSS/网页）',
-    `fetch_type`      VARCHAR(20)  NOT NULL DEFAULT 'RSS' COMMENT '抓取方式：RSS / API / CRAWL',
+    `fetch_type`      VARCHAR(20)  NOT NULL DEFAULT 'RSS' COMMENT '抓取方式：RSS / API / CRAWL / SEARCH',
     `fetch_interval`  INT(11)      NOT NULL DEFAULT 30 COMMENT '抓取间隔（分钟）',
     `fetch_config`    JSON                  DEFAULT NULL COMMENT '额外配置（请求头、参数等）',
     `status`          CHAR(1)      NOT NULL DEFAULT '0' COMMENT '状态：0=启用 1=停用',
