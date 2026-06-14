@@ -63,13 +63,25 @@ public class ModelConfigCache
         List<NewsModelConfig> list = mapper.selectByUsageType(usageType);
         if (list == null || list.isEmpty())
         {
-            log.warn("未找到可用的模型配置 usageType={}，请检查 news_model_config 表", usageType);
+            log.warn("未找到可用的模型配置 usageType={}，请检查 news_model_config 表（is_active=1, usage_type 匹配）", usageType);
             return null;
         }
 
         // 3. 取优先级最高的，解密 API Key
         NewsModelConfig config = list.get(0);
+        log.info("DB查询到模型配置 usageType={} id={} name={} model={} apiKey长度={}",
+                usageType, config.getId(), config.getName(), config.getModelName(),
+                config.getApiKey() != null ? config.getApiKey().length() : 0);
         NewsModelConfig decrypted = decryptAndCopy(config);
+
+        if (StringUtils.isEmpty(decrypted.getApiKey()))
+        {
+            log.error("API Key 解密失败！usageType={} id={} name={} 原始密文长度={}。"
+                    + "请检查：1) AES密钥是否一致 2) API Key是否在DB中正确加密存储 3) 是否通过管理界面直接修改了数据库",
+                    usageType, config.getId(), config.getName(),
+                    config.getApiKey() != null ? config.getApiKey().length() : 0);
+            return null;
+        }
 
         // 4. 写入 Redis 缓存
         redisTemplate.opsForValue().set(cacheKey, decrypted, CACHE_TTL_SECONDS, TimeUnit.SECONDS);
