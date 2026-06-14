@@ -8,7 +8,7 @@
           <span>管理端</span>
         </a>
         <div class="header-divider"></div>
-        <h1 class="header-title">闻道 AI 热点监控</h1>
+        <h1 class="header-title">闻道 · 热点洞察</h1>
       </div>
       <div class="header-center">
         <div class="search-box">
@@ -693,7 +693,7 @@ function renderCharts() {
       grid: { top: 5, right: 5, bottom: 18, left: 28 },
       xAxis: {
         type: 'category',
-        data: stats.value.timelineData.map((d: any) => d.hour),
+        data: stats.value.timelineData.map((d: any) => d.hour.substring(5, 16)),
         axisLabel: { color: '#555', fontSize: 9, interval: 3 },
         axisLine: { show: false },
         axisTick: { show: false }
@@ -1159,15 +1159,17 @@ onUnmounted(() => {
 }
 .card-tags {
   display: flex;
+  flex-wrap: wrap;
   gap: 4px;
   margin-top: 5px;
 }
 .card-tag {
   font-size: 10px;
-  padding: 1px 6px;
-  border-radius: 2px;
-  color: #606266;
-  background: rgba(255,255,255,0.04);
+  padding: 2px 8px;
+  border-radius: 10px;
+  color: #79bbff;
+  background: rgba(64, 158, 255, 0.12);
+  border: 1px solid rgba(64, 158, 255, 0.2);
 }
 
 /* 加载状态 */

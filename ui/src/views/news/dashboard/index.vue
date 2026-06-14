@@ -4,7 +4,7 @@
       <!-- 头部 -->
       <header class="dashboard-header">
       <div class="header-left">
-        <h1>🤖 AI 新闻实时大屏</h1>
+        <h1>🔍 闻道 · 热点洞察</h1>
         <span class="header-time">{{ currentTime }}</span>
       </div>
       <div class="header-right">
@@ -77,6 +77,9 @@
                   <a :href="article.originalUrl" target="_blank">{{ article.title }}</a>
                 </div>
                 <div class="feed-summary" v-if="article.summary">{{ truncateText(article.summary, 80) }}</div>
+                <div class="feed-tags" v-if="parseTags(article.tags).length">
+                  <span v-for="tag in parseTags(article.tags).slice(0, 4)" :key="tag" class="feed-tag">{{ tag }}</span>
+                </div>
                 <div class="feed-time">{{ article.publishTime }}</div>
               </div>
             </TransitionGroup>
@@ -298,7 +301,7 @@ function renderCharts() {
     }
     timelineChart.setOption({
       tooltip: { trigger: 'axis' },
-      xAxis: { type: 'category', data: stats.value.timelineData.map((d: any) => d.hour), axisLabel: { rotate: 45 } },
+      xAxis: { type: 'category', data: stats.value.timelineData.map((d: any) => d.hour.substring(5, 16)), axisLabel: { rotate: 45 } },
       yAxis: { type: 'value' },
       series: [{
         type: 'line',
@@ -326,6 +329,17 @@ function truncateText(text: string, maxLen: number) {
   return text.length > maxLen ? text.substring(0, maxLen) + '...' : text
 }
 
+function parseTags(tags?: string | any): string[] {
+  if (!tags) return []
+  if (Array.isArray(tags)) return tags
+  try {
+    const parsed = JSON.parse(tags)
+    return Array.isArray(parsed) ? parsed : []
+  } catch {
+    return []
+  }
+}
+
 onMounted(async () => {
   await loadStats()
   await loadLatest()
@@ -348,14 +362,20 @@ onUnmounted(() => {
 
 <style scoped>
 .news-dashboard-wrapper {
-  width: 100%;
-  min-height: 100vh;
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
 }
 .news-dashboard {
+  display: flex;
+  flex-direction: column;
   padding: 0;
   background: linear-gradient(135deg, #0f1923 0%, #1a2332 100%);
-  min-height: 100vh;
+  height: 100%;
   color: #e0e0e0;
+  overflow: hidden;
 }
 
 .dashboard-header {
@@ -414,11 +434,50 @@ onUnmounted(() => {
 
 .main-row {
   padding: 0 30px 30px;
+  flex: 1;
+  min-height: 0;
+}
+
+.main-row > .el-col {
+  display: flex;
+  flex-direction: column;
+  height: 100%;
 }
 
 .feed-card, .chart-card {
   background: rgba(255, 255, 255, 0.08) !important;
   border: 1px solid rgba(255, 255, 255, 0.1) !important;
+  display: flex;
+  flex-direction: column;
+}
+
+.feed-card {
+  flex: 1;
+  min-height: 0;
+}
+
+.feed-card :deep(.el-card__body) {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+  overflow: hidden;
+}
+
+.chart-card {
+  flex: 1;
+  min-height: 0;
+}
+
+.chart-card + .chart-card {
+  margin-top: 15px;
+}
+
+.chart-card :deep(.el-card__body) {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
 }
 
 .card-header {
@@ -429,8 +488,9 @@ onUnmounted(() => {
 }
 
 .feed-container {
-  max-height: 600px;
+  flex: 1;
   overflow-y: auto;
+  min-height: 0;
 }
 
 .feed-item {
@@ -483,6 +543,23 @@ onUnmounted(() => {
   margin-top: 4px;
 }
 
+.feed-tags {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+  margin-top: 6px;
+}
+
+.feed-tag {
+  display: inline-block;
+  font-size: 11px;
+  padding: 2px 8px;
+  border-radius: 10px;
+  color: #79bbff;
+  background: rgba(64, 158, 255, 0.12);
+  border: 1px solid rgba(64, 158, 255, 0.2);
+}
+
 .feed-time {
   color: #606266;
   font-size: 11px;
@@ -491,7 +568,8 @@ onUnmounted(() => {
 
 .chart-box {
   width: 100%;
-  height: 250px;
+  flex: 1;
+  min-height: 180px;
 }
 
 .tag-cloud {
