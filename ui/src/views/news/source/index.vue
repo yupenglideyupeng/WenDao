@@ -100,6 +100,7 @@
             <el-option label="RSS" value="RSS" />
             <el-option label="API" value="API" />
             <el-option label="爬虫" value="CRAWL" />
+            <el-option label="SEARCH" value="SEARCH" />
           </el-select>
         </el-form-item>
         <el-form-item label="抓取间隔" prop="fetchInterval">
